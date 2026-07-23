@@ -1,6 +1,7 @@
 -- The `data` column stores a DataConnection JSON object:
 --
 --   {
+--     "id":         "123123-1231-123",
 --     "namespace":  "analytics",
 --     "name":       "clickstream-db",
 --     "provider":   "postgres",

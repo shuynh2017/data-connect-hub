@@ -17,7 +17,7 @@ struct TestMetaStore;
 impl MetaStore for TestMetaStore {
     async fn get_connection(&self, _connection_id: &str) -> Result<DataConnection, MetaStoreError> {
         Ok(DataConnection {
-            uid: "3495723045234587698".to_string(),
+            id: "3495723045234587698".to_string(),
             namespace: "test".to_string(),
             name: "test-db".to_string(),
             provider: "postgres".to_string(),

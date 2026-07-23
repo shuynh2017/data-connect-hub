@@ -5,14 +5,19 @@ Data Connect Hub (DCH) is a middleware service that provides a single integratio
 ## Workspace Layout
 
 ```
-data-connection-hub/
+data-connect-hub/
 ├── commons/               Shared types and traits
 ├── postgres-connector/    PostgreSQL data reader (library)
+├── pg-meta-store/         PostgreSQL metadata store
 ├── flight-service/        Arrow Flight gRPC service (binary)
 ├── rest-service/          HTTP REST service (binary)
+├── py-tools/              Python tooling and scripts
+├── docs/                  Documentation and proposals
 ├── Cargo.toml             Workspace manifest
 ├── Makefile               Build, test, lint, container targets
-└── clippy.toml            Clippy configuration
+├── clippy.toml            Clippy configuration
+├── rustfmt.toml           Rustfmt configuration
+└── rust-toolchain.toml    Rust toolchain pinning
 ```
 
 ## Prerequisites
