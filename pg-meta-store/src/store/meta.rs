@@ -27,7 +27,7 @@ impl PgMetaStore {
 #[async_trait::async_trait]
 impl MetaStore for PgMetaStore {
     async fn get_connection(&self, uid: &str) -> Result<DataConnection, MetaStoreError> {
-        let row = sqlx::query("SELECT data FROM data_connections WHERE data->>'uid' = $1")
+        let row = sqlx::query("SELECT data FROM data_connections WHERE data->>'id' = $1")
             .bind(uid)
             .fetch_one(&self.pool)
             .await

@@ -9,7 +9,7 @@ pub struct DataLocation {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DataConnection {
-    pub uid: String,
+    pub id: String,
     pub namespace: String,
     pub name: String,
     pub provider: String,
