@@ -1,0 +1,89 @@
+use crate::utils::ServerConfig;
+
+use anyhow::Result;
+use arrow_flight::flight_service_server::FlightServiceServer;
+use clap::Parser;
+use config::{Config, File};
+use flight_service::flight::TabularDataService;
+use flight_service::flight::registry::ConnectorsRegistry;
+use pg_meta_store::store::PgMetaStore;
+use postgres_connector::PgConnector;
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::signal;
+
+mod utils;
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct CommandLineArgs {
+    /// Enable JSON logs
+    #[arg(short, long, default_value = "false")]
+    json_logs: bool,
+
+    /// Config file for this server
+    #[arg(short, long, default_value = "config/config.toml")]
+    config: String,
+}
+
+pub async fn shutdown_signal() {
+    let ctrl_c = async {
+        signal::ctrl_c().await.expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    // Wait until either Ctrl+C (SIGINT) or SIGTERM is received
+    tokio::select! {
+        _ = ctrl_c => println!("\nReceived Ctrl+C, shutting down gracefully..."),
+        _ = terminate => println!("\nReceived SIGTERM, shutting down gracefully..."),
+    }
+}
+
+fn load_config(config_file: String) -> Result<ServerConfig> {
+    let config = Config::builder()
+        .add_source(File::with_name(config_file.as_str()))
+        .build()?;
+
+    let config: ServerConfig = config.try_deserialize()?;
+    Ok(config)
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let args = CommandLineArgs::parse();
+    let config = load_config(args.config)?;
+    commons::utils::init_tracing(args.json_logs);
+
+    tracing::info!("Starting DataConnectorHub Flight service");
+
+    let connectors_registry = ConnectorsRegistry::new().with_connector(Arc::new(PgConnector::new(
+        Duration::from_secs(config.ingestion_cache_pools.ttl_secs),
+        Duration::from_secs(config.ingestion_cache_pools.idle_secs),
+        config.ingestion_cache_pools.max_capacity,
+    )));
+
+    let addr = format!("{}:{}", config.server.address, config.server.port).parse()?;
+    let service = TabularDataService::new(
+        Arc::new(connectors_registry),
+        Arc::new(PgMetaStore::new(config.database).await?),
+    );
+
+    tonic::transport::Server::builder()
+        .add_service(FlightServiceServer::new(service))
+        .serve_with_shutdown(addr, shutdown_signal())
+        .await?;
+
+    tracing::info!("DataConnectorHub Flight service stopped");
+
+    Ok(())
+}
