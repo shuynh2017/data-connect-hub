@@ -2,7 +2,7 @@
 # Configuration
 # -------------------------------------------------------------------
 
-VERSION          ?= $(shell perl -ne 'print $$1 if /^version\s*=\s*"(.+)"/' Cargo.toml)
+VERSION          ?= $(or $(shell perl -ne 'if (/^version\s*=\s*"(.+)"/) { print $$1; exit }' Cargo.toml */Cargo.toml 2>/dev/null),latest)
 IMAGE            ?= data-connection-hub
 CONTAINER_ENGINE ?= $(shell command -v podman 2>/dev/null || command -v docker 2>/dev/null)
 V                ?=
@@ -59,10 +59,14 @@ container-rest: | require-container-engine
 container-all: container-flight container-rest
 
 container-run-flight: | require-container-engine
-	$(CONTAINER_ENGINE) run --rm --network=host $(IMAGE)-flight:$(VERSION) 2>&1
+	$(CONTAINER_ENGINE) run --rm --network=host \
+		-v $(CURDIR)/flight-service/samples/config.toml:/config/config.toml:ro \
+		$(IMAGE)-flight:$(VERSION) 2>&1
 
 container-run-rest: | require-container-engine
-	$(CONTAINER_ENGINE) run --rm --network=host $(IMAGE)-rest:$(VERSION) 2>&1
+	$(CONTAINER_ENGINE) run --rm --network=host \
+		-v $(CURDIR)/rest-service/samples/config.toml:/config/config.toml:ro \
+		$(IMAGE)-rest:$(VERSION) 2>&1
 
 # -------------------------------------------------------------------
 # Test
