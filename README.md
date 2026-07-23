@@ -68,7 +68,7 @@ make container-flight
 make container-rest
 
 # Build all
-make container-all VERSION=0.1.0
+make container-all
 
 # Run
 make container-run-flight
