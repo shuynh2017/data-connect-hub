@@ -1,5 +1,5 @@
 [database]
-url = "postgresql://mdanciu@localhost:5432/mdanciu"
+url = "postgresql://dch_user:dch_password@localhost:5432/dch_db"
 
 [server]
 address = "127.0.0.1"

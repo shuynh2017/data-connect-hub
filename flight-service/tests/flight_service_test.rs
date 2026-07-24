@@ -24,7 +24,7 @@ impl MetaStore for TestMetaStore {
             format: "jdbc".to_string(),
             tenant_id: "tenant-test".to_string(),
             location: DataLocation {
-                url: "postgresql://mdanciu@localhost:5432/mdanciu".to_string(),
+                url: "postgresql://dch_user:dch_password@localhost:5432/dch_db".to_string(),
             },
             created_at: "2026-07-21T00:00:00Z".to_string(),
             updated_at: "2026-07-21T00:00:00Z".to_string(),
