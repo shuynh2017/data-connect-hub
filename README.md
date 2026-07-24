@@ -23,7 +23,7 @@ data-connect-hub/
 ## Prerequisites
 
 - Rust 1.96+
-- PostgreSQL (for integration testing)
+- PostgreSQL (for integration testing, for `make container-run-flight`). The default URL in `flight-service/sample/config.toml` is `"postgresql://dch_user:dch_password@localhost:5432/dch_db"`, so you need to create a user `dch_user`, with `dch_password` as password, and `dch_db` database.
 - Podman or Docker (for container builds)
 
 ## Getting Started
