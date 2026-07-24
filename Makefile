@@ -74,6 +74,7 @@ test:
 test-unit:
 	cargo test -p commons $(_NOCAPTURE)
 	cargo test -p postgres-connector $(_NOCAPTURE)
+	cargo test -p pg-meta-store $(_NOCAPTURE)
 	cargo test -p rest-service $(_NOCAPTURE)
 
 test-integration:
