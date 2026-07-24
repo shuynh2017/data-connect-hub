@@ -45,10 +45,13 @@ mod tests {
     }
 
     #[test]
-    fn test_server_config_missing_field() {
+    fn test_server_config_missing_port() {
         let toml_str = r#"
             [server]
             address = "127.0.0.1"
+
+            [_database]
+            url = "postgresql://user:pass@localhost:5432/testdb"
         "#;
 
         let config = Config::builder()
@@ -56,7 +59,43 @@ mod tests {
             .build()
             .unwrap();
 
-        let result = config.try_deserialize::<ServerConfig>();
-        assert!(result.is_err());
+        let err = config.try_deserialize::<ServerConfig>().unwrap_err();
+        assert!(err.to_string().contains("port"), "expected error about 'port', got: {err}");
+    }
+
+    #[test]
+    fn test_server_config_missing_database() {
+        let toml_str = r#"
+            [server]
+            address = "127.0.0.1"
+            port = 8080
+        "#;
+
+        let config = Config::builder()
+            .add_source(config::File::from_str(toml_str, config::FileFormat::Toml))
+            .build()
+            .unwrap();
+
+        let err = config.try_deserialize::<ServerConfig>().unwrap_err();
+        assert!(err.to_string().contains("_database"), "expected error about '_database', got: {err}");
+    }
+
+    #[test]
+    fn test_server_config_missing_address() {
+        let toml_str = r#"
+            [server]
+            port = 8080
+
+            [_database]
+            url = "postgresql://user:pass@localhost:5432/testdb"
+        "#;
+
+        let config = Config::builder()
+            .add_source(config::File::from_str(toml_str, config::FileFormat::Toml))
+            .build()
+            .unwrap();
+
+        let err = config.try_deserialize::<ServerConfig>().unwrap_err();
+        assert!(err.to_string().contains("address"), "expected error about 'address', got: {err}");
     }
 }

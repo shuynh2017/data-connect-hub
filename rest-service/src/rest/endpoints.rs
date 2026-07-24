@@ -20,9 +20,23 @@ mod tests {
 
     use super::*;
 
+    fn test_app_config(cfg: &mut web::ServiceConfig) {
+        cfg.service(
+            web::scope("/v1/data")
+                .service(web::resource("/connections").to(list_connections))
+                .service(web::resource("/connections/{namespace}").to(list_connections))
+                .service(web::resource("/connections/{namespace}/{name}").to(get_connection)),
+        );
+    }
+
     #[actix_web::test]
     async fn test_not_found() {
-        let app = test::init_service(App::new().default_service(web::route().to(not_found))).await;
+        let app = test::init_service(
+            App::new()
+                .configure(test_app_config)
+                .default_service(web::route().to(not_found)),
+        )
+        .await;
         let req = test::TestRequest::get().uri("/anything").to_request();
         let resp = test::call_service(&app, req).await;
 
@@ -33,8 +47,10 @@ mod tests {
 
     #[actix_web::test]
     async fn test_list_connections_no_namespace() {
-        let app = test::init_service(App::new().route("/connections", web::get().to(list_connections))).await;
-        let req = test::TestRequest::get().uri("/connections").to_request();
+        let app = test::init_service(App::new().configure(test_app_config)).await;
+        let req = test::TestRequest::get()
+            .uri("/v1/data/connections")
+            .to_request();
         let resp = test::call_service(&app, req).await;
 
         assert_eq!(resp.status(), 200);
@@ -44,23 +60,25 @@ mod tests {
 
     #[actix_web::test]
     async fn test_list_connections_with_namespace() {
-        let app =
-            test::init_service(App::new().route("/connections/{namespace}", web::get().to(list_connections))).await;
-        let req = test::TestRequest::get().uri("/connections/my-namespace").to_request();
+        let app = test::init_service(App::new().configure(test_app_config)).await;
+        let req = test::TestRequest::get()
+            .uri("/v1/data/connections/my-namespace")
+            .to_request();
         let resp = test::call_service(&app, req).await;
 
         assert_eq!(resp.status(), 200);
         let body = test::read_body(resp).await;
-        assert_eq!(body, "Listing connections for namespace: Some(\"my-namespace\")");
+        assert_eq!(
+            body,
+            "Listing connections for namespace: Some(\"my-namespace\")"
+        );
     }
 
     #[actix_web::test]
     async fn test_get_connection() {
-        let app =
-            test::init_service(App::new().route("/connections/{namespace}/{name}", web::get().to(get_connection)))
-                .await;
+        let app = test::init_service(App::new().configure(test_app_config)).await;
         let req = test::TestRequest::get()
-            .uri("/connections/my-namespace/my-connection")
+            .uri("/v1/data/connections/my-namespace/my-connection")
             .to_request();
         let resp = test::call_service(&app, req).await;
 
