@@ -59,20 +59,34 @@ mod tests {
 
     #[test]
     fn test_data_connection_serialize_deserialize() {
-        let conn = sample_connection();
-        let json = serde_json::to_string(&conn).unwrap();
-        let deserialized: DataConnection = serde_json::from_str(&json).unwrap();
+        let fixture = serde_json::json!({
+            "id": "123",
+            "namespace": "test-ns",
+            "name": "test-conn",
+            "provider": "postgres",
+            "format": "jdbc",
+            "tenant_id": "tenant-1",
+            "location": { "url": "postgresql://localhost:5432/db" },
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z",
+            "properties": { "key": "value" }
+        });
 
-        assert_eq!(deserialized.id, conn.id);
-        assert_eq!(deserialized.namespace, conn.namespace);
-        assert_eq!(deserialized.name, conn.name);
-        assert_eq!(deserialized.provider, conn.provider);
-        assert_eq!(deserialized.format, conn.format);
-        assert_eq!(deserialized.tenant_id, conn.tenant_id);
-        assert_eq!(deserialized.location.url, conn.location.url);
-        assert_eq!(deserialized.created_at, conn.created_at);
-        assert_eq!(deserialized.updated_at, conn.updated_at);
-        assert_eq!(deserialized.properties, conn.properties);
+        let conn: DataConnection = serde_json::from_value(fixture.clone()).unwrap();
+
+        assert_eq!(conn.id, "123");
+        assert_eq!(conn.namespace, "test-ns");
+        assert_eq!(conn.name, "test-conn");
+        assert_eq!(conn.provider, "postgres");
+        assert_eq!(conn.format, "jdbc");
+        assert_eq!(conn.tenant_id, "tenant-1");
+        assert_eq!(conn.location.url, "postgresql://localhost:5432/db");
+        assert_eq!(conn.created_at, "2026-01-01T00:00:00Z");
+        assert_eq!(conn.updated_at, "2026-01-01T00:00:00Z");
+        assert_eq!(conn.properties["key"], "value");
+
+        let round_tripped = serde_json::to_value(&conn).unwrap();
+        assert_eq!(round_tripped, fixture);
     }
 
     #[test]

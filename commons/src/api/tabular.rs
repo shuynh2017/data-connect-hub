@@ -52,6 +52,10 @@ mod tests {
         assert_eq!(state.query, "SELECT * FROM users");
         assert_eq!(state.schema.fields().len(), 2);
         assert_eq!(state.schema.field(0).name(), "id");
+        assert_eq!(*state.schema.field(0).data_type(), DataType::Int64);
+        assert!(!state.schema.field(0).is_nullable());
         assert_eq!(state.schema.field(1).name(), "name");
+        assert_eq!(*state.schema.field(1).data_type(), DataType::Utf8);
+        assert!(state.schema.field(1).is_nullable());
     }
 }
