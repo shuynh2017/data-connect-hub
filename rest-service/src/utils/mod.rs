@@ -10,6 +10,7 @@ pub struct Server {
 #[derive(Debug, Deserialize)]
 pub struct ServerConfig {
     pub server: Server,
+    #[serde(rename = "database")]
     pub _database: DatabaseConfig,
 }
 
