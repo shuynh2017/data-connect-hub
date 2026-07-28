@@ -78,14 +78,14 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64
           tags: |
-            ${{ env.REGISTRY }}/${{ github.repository }}-flight:${{ steps.meta.outputs.commit_sha }}
-            ${{ env.REGISTRY }}/${{ github.repository }}-flight:${{ steps.meta.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ github.repository }}/flight-service:${{ steps.meta.outputs.commit_sha }}
+            ${{ env.REGISTRY }}/${{ github.repository }}/flight-service:${{ steps.meta.outputs.tag }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ steps.meta.outputs.version }}
             org.opencontainers.image.created=${{ steps.meta.outputs.build_date }}
-            org.opencontainers.image.title=data-connect-hub-flight
+            org.opencontainers.image.title=flight-service
             org.opencontainers.image.description=Data Connect Hub - Flight Service (gRPC/Arrow Flight)
           cache-from: type=gha,scope=flight
           cache-to: type=gha,mode=max,scope=flight
@@ -98,14 +98,14 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64
           tags: |
-            ${{ env.REGISTRY }}/${{ github.repository }}-rest:${{ steps.meta.outputs.commit_sha }}
-            ${{ env.REGISTRY }}/${{ github.repository }}-rest:${{ steps.meta.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ github.repository }}/rest-service:${{ steps.meta.outputs.commit_sha }}
+            ${{ env.REGISTRY }}/${{ github.repository }}/rest-service:${{ steps.meta.outputs.tag }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ steps.meta.outputs.version }}
             org.opencontainers.image.created=${{ steps.meta.outputs.build_date }}
-            org.opencontainers.image.title=data-connect-hub-rest
+            org.opencontainers.image.title=rest-service
             org.opencontainers.image.description=Data Connect Hub - REST Service (HTTP/actix-web)
           cache-from: type=gha,scope=rest
           cache-to: type=gha,mode=max,scope=rest
@@ -117,7 +117,7 @@ jobs:
           TAG: ${{ steps.meta.outputs.tag }}
         run: |
           echo "Images pushed:"
-          echo "  - ${REGISTRY_REPO}-flight:${COMMIT_SHA}"
-          echo "  - ${REGISTRY_REPO}-flight:${TAG}"
-          echo "  - ${REGISTRY_REPO}-rest:${COMMIT_SHA}"
-          echo "  - ${REGISTRY_REPO}-rest:${TAG}"
+          echo "  - ${REGISTRY_REPO}/flight-service:${COMMIT_SHA}"
+          echo "  - ${REGISTRY_REPO}/flight-service:${TAG}"
+          echo "  - ${REGISTRY_REPO}/rest-service:${COMMIT_SHA}"
+          echo "  - ${REGISTRY_REPO}/rest-service:${TAG}"
