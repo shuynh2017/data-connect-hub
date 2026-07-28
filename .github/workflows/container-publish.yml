@@ -17,6 +17,7 @@ env:
 
 jobs:
   docker:
+    if: github.repository == 'opendatahub-io/data-connect-hub'
     runs-on: ubuntu-latest
     permissions:
       actions: write
