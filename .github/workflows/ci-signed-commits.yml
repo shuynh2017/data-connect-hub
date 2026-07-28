@@ -1,5 +1,9 @@
 name: Check Signed Commits
-on: pull_request_target
+
+on:
+  pull_request:
+    branches:
+      - main
 
 jobs:
   signed-commits:
@@ -7,28 +11,36 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: write
     steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
-
-      - name: Verify commit signatures
+      - name: Verify commit signatures via GitHub API
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
         run: |
-          BASE="${{ github.event.pull_request.base.sha }}"
-          HEAD="${{ github.event.pull_request.head.sha }}"
           failed=0
+          page=1
 
-          for sha in $(git rev-list "$BASE".."$HEAD"); do
-            # Skip merge commits
-            if [ "$(git rev-list --parents -1 "$sha" | wc -w)" -gt 2 ]; then
-              continue
+          while true; do
+            commits=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/commits?per_page=100&page=${page}" \
+              --jq '.[] | "\(.sha)\t\(.parents | length)\t\(.commit.verification.verified)"')
+
+            if [ -z "$commits" ]; then
+              break
             fi
-            if ! git verify-commit "$sha" 2>/dev/null; then
-              echo "WARNING: Commit $sha is not signed."
-              failed=1
-            fi
+
+            while IFS=$'\t' read -r sha parent_count verified; do
+              # Skip merge commits
+              if [ "$parent_count" -gt 1 ]; then
+                continue
+              fi
+              if [ "$verified" != "true" ]; then
+                echo "WARNING: Commit ${sha:0:7} is not signed."
+                failed=1
+              fi
+            done <<< "$commits"
+
+            page=$((page + 1))
           done
 
           if [ "$failed" -eq 1 ]; then

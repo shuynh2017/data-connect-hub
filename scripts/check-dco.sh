@@ -17,7 +17,7 @@ for sha in $(git rev-list "$base".."$head"); do
   if [ "$(git rev-list --parents -1 "$sha" | wc -w)" -gt 2 ]; then
     continue
   fi
-  if ! git log -1 --format='%B' "$sha" | grep -qE '^Signed-off-by: .+ <.+>'; then
+  if ! git interpret-trailers --parse < <(git log -1 --format='%B' "$sha") | grep -qE '^Signed-off-by: .+ <.+>'; then
     echo "ERROR: Commit $sha is missing Signed-off-by. Use 'git commit -s'."
     failed=1
   fi

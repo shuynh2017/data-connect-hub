@@ -8,6 +8,10 @@ on:
       - 'v*.*.*'
   workflow_dispatch:
 
+concurrency:
+  group: container-publish-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   REGISTRY: ghcr.io
 
@@ -18,11 +22,12 @@ jobs:
       actions: write
       contents: read
       packages: write
-      id-token: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
@@ -39,17 +44,21 @@ jobs:
 
       - name: Extract metadata
         id: meta
+        env:
+          GH_SHA: ${{ github.sha }}
+          GH_REF_TYPE: ${{ github.ref_type }}
+          GH_REF_NAME: ${{ github.ref_name }}
         run: |
-          COMMIT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          COMMIT_SHA="${GH_SHA:0:7}"
           echo "commit_sha=${COMMIT_SHA}" >> $GITHUB_OUTPUT
 
           BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           echo "build_date=${BUILD_DATE}" >> $GITHUB_OUTPUT
 
-          if [[ "${{ github.ref_type }}" == "tag" ]]; then
-            VERSION="${{ github.ref_name }}"
-            TAG="${{ github.ref_name }}"
-          elif [[ "${{ github.ref_name }}" == "main" ]]; then
+          if [[ "${GH_REF_TYPE}" == "tag" ]]; then
+            VERSION="${GH_REF_NAME}"
+            TAG="${GH_REF_NAME}"
+          elif [[ "${GH_REF_NAME}" == "main" ]]; then
             VERSION="main-${COMMIT_SHA}"
             TAG="latest"
           else
@@ -101,9 +110,13 @@ jobs:
           cache-to: type=gha,mode=max,scope=rest
 
       - name: Output image tags
+        env:
+          REGISTRY_REPO: ${{ env.REGISTRY }}/${{ github.repository }}
+          COMMIT_SHA: ${{ steps.meta.outputs.commit_sha }}
+          TAG: ${{ steps.meta.outputs.tag }}
         run: |
           echo "Images pushed:"
-          echo "  - ${{ env.REGISTRY }}/${{ github.repository }}-flight:${{ steps.meta.outputs.commit_sha }}"
-          echo "  - ${{ env.REGISTRY }}/${{ github.repository }}-flight:${{ steps.meta.outputs.tag }}"
-          echo "  - ${{ env.REGISTRY }}/${{ github.repository }}-rest:${{ steps.meta.outputs.commit_sha }}"
-          echo "  - ${{ env.REGISTRY }}/${{ github.repository }}-rest:${{ steps.meta.outputs.tag }}"
+          echo "  - ${REGISTRY_REPO}-flight:${COMMIT_SHA}"
+          echo "  - ${REGISTRY_REPO}-flight:${TAG}"
+          echo "  - ${REGISTRY_REPO}-rest:${COMMIT_SHA}"
+          echo "  - ${REGISTRY_REPO}-rest:${TAG}"
