@@ -34,7 +34,7 @@ impl MetaStore for TestMetaStore {
             properties: HashMap::new(),
             credentials: HashMap::from([(
                 "url".to_string(),
-                "postgresql://mdanciu@localhost:5432/mdanciu".to_string(),
+                "postgresql://db_user@localhost:5432/db_name".to_string(),
             )]),
         })
     }
@@ -74,7 +74,7 @@ async fn test_flight_sql_select_prompts() {
         namespace: "secret".to_string(),
         properties: HashMap::from([(
             "url".to_string(),
-            "postgresql://mdanciu@localhost:5432/mdanciu".to_string(),
+            "postgresql://db_user@localhost:5432/db_name".to_string(),
         )]),
     }]);
 

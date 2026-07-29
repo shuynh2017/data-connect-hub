@@ -104,10 +104,10 @@ mod tests {
         let fixture = serde_json::json!({
             "id": "123",
             "name": "test-conn",
-            "data_connection_type": "postgres",
+            "data_connection_type_id": "postgres",
             "format": "jdbc",
             "tenant_id": "tenant-1",
-            "admin": { "secret_ref": "secret/test-conn", "location": "postgresql://localhost:5432/db" },
+            "admin": { "secret_ref": "secret/test-conn" },
             "created_at": "2026-01-01T00:00:00Z",
             "updated_at": "2026-01-01T00:00:00Z",
             "properties": { "key": "value" }
@@ -137,5 +137,106 @@ mod tests {
         assert_eq!(cloned.id, conn.id);
         assert_eq!(cloned.admin.secret_ref, conn.admin.secret_ref);
         assert_eq!(cloned.properties, conn.properties);
+    }
+
+    fn sample_data_connection_type() -> DataConnectionType {
+        DataConnectionType {
+            id: "postgres".to_string(),
+            tenant_id: Some("tenant-1".to_string()),
+            name: "PostgreSQL".to_string(),
+            provider: "postgres".to_string(),
+            description: Some("PostgreSQL database connection".to_string()),
+            credentials_fields: vec![
+                Field {
+                    name: "url".to_string(),
+                    label: "URL".to_string(),
+                    description: Some("PostgreSQL connection URL".to_string()),
+                    required: true,
+                    d_type: "string".to_string(),
+                    enum_values: None,
+                    default_value: None,
+                },
+            ],
+        }
+    }
+
+    #[test]
+    fn test_data_connection_type_serialize_deserialize() {
+        let dct = sample_data_connection_type();
+        let json = serde_json::to_value(&dct).unwrap();
+
+        assert_eq!(json["id"], "postgres");
+        assert_eq!(json["tenant_id"], "tenant-1");
+        assert_eq!(json["name"], "PostgreSQL");
+        assert_eq!(json["provider"], "postgres");
+        assert_eq!(json["description"], "PostgreSQL database connection");
+        assert_eq!(json["credentials_fields"][0]["name"], "url");
+        assert_eq!(json["credentials_fields"][0]["type"], "string");
+        assert_eq!(json["credentials_fields"][0]["required"], true);
+
+        let deserialized: DataConnectionType = serde_json::from_value(json).unwrap();
+        assert_eq!(deserialized.id, dct.id);
+        assert_eq!(deserialized.provider, dct.provider);
+        assert_eq!(deserialized.credentials_fields.len(), 1);
+        assert_eq!(deserialized.credentials_fields[0].d_type, "string");
+    }
+
+    #[test]
+    fn test_data_connection_type_optional_fields() {
+        let json = serde_json::json!({
+            "id": "mysql",
+            "name": "MySQL",
+            "provider": "mysql",
+            "description": null,
+            "tenant_id": null,
+            "credentials_fields": []
+        });
+
+        let dct: DataConnectionType = serde_json::from_value(json).unwrap();
+        assert!(dct.description.is_none());
+        assert!(dct.tenant_id.is_none());
+        assert!(dct.credentials_fields.is_empty());
+    }
+
+    #[test]
+    fn test_data_connection_type_clone() {
+        let dct = sample_data_connection_type();
+        let cloned = dct.clone();
+
+        assert_eq!(cloned.id, dct.id);
+        assert_eq!(cloned.name, dct.name);
+        assert_eq!(cloned.provider, dct.provider);
+        assert_eq!(cloned.description, dct.description);
+        assert_eq!(cloned.credentials_fields.len(), dct.credentials_fields.len());
+        assert_eq!(cloned.credentials_fields[0].name, dct.credentials_fields[0].name);
+    }
+
+    #[test]
+    fn test_data_connection_type_with_enum_field() {
+        let json = serde_json::json!({
+            "id": "s3",
+            "name": "S3",
+            "provider": "s3",
+            "credentials_fields": [
+                {
+                    "name": "region",
+                    "label": "Region",
+                    "required": true,
+                    "type": "enum",
+                    "enum_values": [
+                        { "value": "us-east-1", "label": "US East" },
+                        { "value": "eu-west-1", "label": "EU West" }
+                    ]
+                }
+            ]
+        });
+
+        let dct: DataConnectionType = serde_json::from_value(json).unwrap();
+        let field = &dct.credentials_fields[0];
+        assert_eq!(field.d_type, "enum");
+        let enums = field.enum_values.as_ref().unwrap();
+        assert_eq!(enums.len(), 2);
+        assert_eq!(enums[0].value, "us-east-1");
+        assert_eq!(enums[1].label, "EU West");
     }
 }
