@@ -72,7 +72,7 @@ impl TabularDataService {
             // Hydrate the connection with the secret credentials
             let secret = self
                 .secret_store
-                .get_secret(&tenant_id, secret_ref)
+                .get_secret(tenant_id, secret_ref)
                 .await
                 .map_err(|e| Status::internal(e.to_string()))?;
             r.credentials = secret.properties.clone();

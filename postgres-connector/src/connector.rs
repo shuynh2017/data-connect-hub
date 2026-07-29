@@ -41,7 +41,9 @@ impl FlightConnector for PgConnector {
     }
 
     async fn get_reader(&self, data_connection: &DataConnection) -> Result<Arc<dyn TabularReader>, ApiError> {
-        let url = data_connection.credentials.get("url")
+        let url = data_connection
+            .credentials
+            .get("url")
             .ok_or_else(|| ApiError::ConnectionError("PostgreSQL URL is required".to_string()))?;
         let pool = self
             .pools
@@ -61,8 +63,7 @@ pub struct PgReader {
     pool: PgPool,
 }
 
-impl PgReader {
-}
+impl PgReader {}
 
 #[async_trait::async_trait]
 impl TabularReader for PgReader {

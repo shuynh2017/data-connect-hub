@@ -17,35 +17,35 @@ pub async fn list_connection_types() -> impl Responder {
 
 pub async fn get_connection_type(path: web::Path<String>) -> impl Responder {
     let id = path.into_inner();
-    HttpResponse::Ok().body(format!("{}", id))
+    HttpResponse::Ok().body(id)
 }
 
-pub async fn create_connection(body: web::Json<DataConnection>) -> impl Responder {
+pub async fn create_connection(_body: web::Json<DataConnection>) -> impl Responder {
     HttpResponse::Ok().body("Creating connection")
 }
 
-pub async fn patch_connection(path: web::Path<(String, String)>, body: web::Json<DataConnection>) -> impl Responder {
+pub async fn patch_connection(path: web::Path<(String, String)>, _body: web::Json<DataConnection>) -> impl Responder {
     let (namespace, name) = path.into_inner();
     HttpResponse::Ok().body(format!("{}:{}", namespace, name))
 }
 
-pub async fn create_connection_type(body: web::Json<DataConnectionType>) -> impl Responder {
+pub async fn create_connection_type(_body: web::Json<DataConnectionType>) -> impl Responder {
     HttpResponse::Ok().body("Creating connection type")
 }
 
-pub async fn patch_connection_type(path: web::Path<String>, body: web::Json<DataConnectionType>) -> impl Responder {
+pub async fn patch_connection_type(path: web::Path<String>, _body: web::Json<DataConnectionType>) -> impl Responder {
     let id = path.into_inner();
-    HttpResponse::Ok().body(format!("{}", id))
+    HttpResponse::Ok().body(id)
 }
 
 pub async fn delete_connection(path: web::Path<String>) -> impl Responder {
     let id = path.into_inner();
-    HttpResponse::Ok().body(format!("{}", id))
+    HttpResponse::Ok().body(id)
 }
 
 pub async fn delete_connection_type(path: web::Path<String>) -> impl Responder {
     let id = path.into_inner();
-    HttpResponse::Ok().body(format!("{}", id))
+    HttpResponse::Ok().body(id)
 }
 
 pub async fn not_found() -> impl Responder {
@@ -65,8 +65,8 @@ mod tests {
                 .route("/connections/{id}", web::get().to(get_connection))
                 .route("/connection_types", web::get().to(list_connection_types))
                 .route("/connection_types/{id}", web::get().to(get_connection_type))
-                .default_service(web::route().to(not_found))
-         );
+                .default_service(web::route().to(not_found)),
+        );
     }
 
     #[actix_web::test]

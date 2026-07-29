@@ -5,7 +5,6 @@ use commons::errors::MetaStoreError;
 use serde::Deserialize;
 use sqlx::{PgPool, Row};
 
-
 #[derive(Debug, Deserialize)]
 pub struct DatabaseConfig {
     pub url: String,

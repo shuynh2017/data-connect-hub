@@ -39,8 +39,6 @@ impl std::fmt::Debug for DataConnection {
     }
 }
 
-
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct EnumValue {
     pub value: String,
@@ -69,7 +67,6 @@ pub struct DataConnectionType {
     pub credentials_fields: Vec<Field>,
 }
 
-
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Secret {
     pub name: String,
@@ -94,7 +91,7 @@ pub trait MetaStore {
 }
 
 #[async_trait::async_trait]
-pub trait SecretStore { 
+pub trait SecretStore {
     async fn get_secret(&self, namespace: &str, name: &str) -> Result<&Secret, SecretStoreError>;
 }
 
@@ -176,17 +173,15 @@ mod tests {
             name: "PostgreSQL".to_string(),
             provider: "postgres".to_string(),
             description: Some("PostgreSQL database connection".to_string()),
-            credentials_fields: vec![
-                Field {
-                    name: "url".to_string(),
-                    label: "URL".to_string(),
-                    description: Some("PostgreSQL connection URL".to_string()),
-                    required: true,
-                    d_type: "string".to_string(),
-                    enum_values: None,
-                    default_value: None,
-                },
-            ],
+            credentials_fields: vec![Field {
+                name: "url".to_string(),
+                label: "URL".to_string(),
+                description: Some("PostgreSQL connection URL".to_string()),
+                required: true,
+                d_type: "string".to_string(),
+                enum_values: None,
+                default_value: None,
+            }],
         }
     }
 

@@ -55,12 +55,11 @@ async fn main() -> Result<()> {
                     .route("/connections/{id}", web::get().to(get_connection))
                     .route("/connections/{id}", web::patch().to(patch_connection))
                     .route("/connections/{id}", web::delete().to(delete_connection))
-
                     .route("/connection_types", web::get().to(list_connection_types))
                     .route("/connection_types", web::post().to(create_connection_type))
                     .route("/connection_types/{id}", web::get().to(get_connection_type))
                     .route("/connection_types/{id}", web::patch().to(patch_connection_type))
-                    .route("/connection_types/{id}", web::delete().to(delete_connection_type))
+                    .route("/connection_types/{id}", web::delete().to(delete_connection_type)),
             )
             .default_service(web::route().to(not_found))
     })

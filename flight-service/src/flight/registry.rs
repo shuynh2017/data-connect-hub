@@ -25,4 +25,3 @@ impl ConnectorsRegistry {
             .ok_or(ApiError::InvalidRequest(format!("Connector not found: {}", provider)))
     }
 }
-

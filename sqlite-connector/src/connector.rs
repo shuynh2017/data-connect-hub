@@ -15,16 +15,21 @@ use moka::future::Cache;
 use sqlx::sqlite::SqliteRow;
 use sqlx::{Column, Executor, Row, SqlitePool, Statement, TypeInfo};
 
-
 pub struct SqliteConnector {
     pools: Cache<String, SqlitePool>,
 }
 
-impl SqliteConnector {
-    pub fn new() -> Self {
+impl Default for SqliteConnector {
+    fn default() -> Self {
         Self {
             pools: Cache::builder().max_capacity(2).build(),
         }
+    }
+}
+
+impl SqliteConnector {
+    pub fn new() -> Self {
+        Self::default()
     }
 }
 
