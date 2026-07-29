@@ -2,7 +2,7 @@ use actix_cors::Cors;
 use actix_web::{App, HttpServer, web};
 use clap::Parser;
 
-use crate::rest::endpoints::{get_connection, list_connections, not_found};
+use crate::rest::endpoints::*;
 use crate::utils::ServerConfig;
 use anyhow::Result;
 use config::{Config, File};
@@ -50,9 +50,17 @@ async fn main() -> Result<()> {
             .wrap(cors)
             .service(
                 web::scope("/v1/data")
-                    .service(web::resource("/connections").to(list_connections))
-                    .service(web::resource("/connections/{namespace}").to(list_connections))
-                    .service(web::resource("/connections/{namespace}/{name}").to(get_connection)),
+                    .route("/connections", web::get().to(list_connections))
+                    .route("/connections", web::post().to(create_connection))
+                    .route("/connections/{id}", web::get().to(get_connection))
+                    .route("/connections/{id}", web::patch().to(patch_connection))
+                    .route("/connections/{id}", web::delete().to(delete_connection))
+
+                    .route("/connection_types", web::get().to(list_connection_types))
+                    .route("/connection_types", web::post().to(create_connection_type))
+                    .route("/connection_types/{id}", web::get().to(get_connection_type))
+                    .route("/connection_types/{id}", web::patch().to(patch_connection_type))
+                    .route("/connection_types/{id}", web::delete().to(delete_connection_type))
             )
             .default_service(web::route().to(not_found))
     })
