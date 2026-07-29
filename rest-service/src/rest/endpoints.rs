@@ -95,6 +95,4 @@ mod tests {
         let body = test::read_body(resp).await;
         assert_eq!(body, "Listing connections for namespace: None");
     }
-
-
 }

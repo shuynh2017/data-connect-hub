@@ -22,6 +22,23 @@ struct CommandLineArgs {
     config: String,
 }
 
+fn api_routes(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::scope("/v1/data")
+            .route("/connections", web::get().to(list_connections))
+            .route("/connections", web::post().to(create_connection))
+            .route("/connections/{id}", web::get().to(get_connection))
+            .route("/connections/{id}", web::patch().to(patch_connection))
+            .route("/connections/{id}", web::delete().to(delete_connection))
+            .route("/connection_types", web::get().to(list_connection_types))
+            .route("/connection_types", web::post().to(create_connection_type))
+            .route("/connection_types/{id}", web::get().to(get_connection_type))
+            .route("/connection_types/{id}", web::patch().to(patch_connection_type))
+            .route("/connection_types/{id}", web::delete().to(delete_connection_type)),
+    )
+    .default_service(web::route().to(not_found));
+}
+
 fn load_config(config_file: String) -> Result<ServerConfig> {
     let config = Config::builder()
         .add_source(File::with_name(config_file.as_str()))
@@ -46,22 +63,7 @@ async fn main() -> Result<()> {
             .allow_any_method()
             .allow_any_header();
 
-        App::new()
-            .wrap(cors)
-            .service(
-                web::scope("/v1/data")
-                    .route("/connections", web::get().to(list_connections))
-                    .route("/connections", web::post().to(create_connection))
-                    .route("/connections/{id}", web::get().to(get_connection))
-                    .route("/connections/{id}", web::patch().to(patch_connection))
-                    .route("/connections/{id}", web::delete().to(delete_connection))
-                    .route("/connection_types", web::get().to(list_connection_types))
-                    .route("/connection_types", web::post().to(create_connection_type))
-                    .route("/connection_types/{id}", web::get().to(get_connection_type))
-                    .route("/connection_types/{id}", web::patch().to(patch_connection_type))
-                    .route("/connection_types/{id}", web::delete().to(delete_connection_type)),
-            )
-            .default_service(web::route().to(not_found))
+        App::new().wrap(cors).configure(api_routes)
     })
     .bind((config.server.address, config.server.port))?
     .run()
