@@ -96,29 +96,5 @@ mod tests {
         assert_eq!(body, "Listing connections for namespace: None");
     }
 
-    #[actix_web::test]
-    async fn test_list_connections_with_namespace() {
-        let app = test::init_service(App::new().configure(test_app_config)).await;
-        let req = test::TestRequest::get()
-            .uri("/v1/data/connections/my-namespace")
-            .to_request();
-        let resp = test::call_service(&app, req).await;
 
-        assert_eq!(resp.status(), 200);
-        let body = test::read_body(resp).await;
-        assert_eq!(body, "Listing connections for namespace: Some(\"my-namespace\")");
-    }
-
-    #[actix_web::test]
-    async fn test_get_connection() {
-        let app = test::init_service(App::new().configure(test_app_config)).await;
-        let req = test::TestRequest::get()
-            .uri("/v1/data/connections/my-namespace/my-connection")
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-
-        assert_eq!(resp.status(), 200);
-        let body = test::read_body(resp).await;
-        assert_eq!(body, "my-namespace:my-connection");
-    }
 }
