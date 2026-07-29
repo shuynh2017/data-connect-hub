@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use arrow::array::{Array, StringArray};
 use arrow_flight::{flight_service_server::FlightServiceServer, sql::client::FlightSqlServiceClient};
-use commons::api::X_DATA_CONNECTION_ID;
+use commons::api::{X_DATA_CONNECTION_ID, X_TENANT_ID};
 use commons::api::connections::{Admin, DataConnection, DataConnectionType, MetaStore};
 use commons::errors::MetaStoreError;
 use flight_service::flight::service::TabularDataService;
@@ -100,6 +100,7 @@ async fn test_flight_sql_select_prompts() {
 
     let mut client = FlightSqlServiceClient::new(channel);
     client.set_header(X_DATA_CONNECTION_ID, "default/test-db");
+    client.set_header(X_TENANT_ID, "default");
 
     let flight_info = client.execute("SELECT * FROM prompts".to_string(), None).await.unwrap();
 
