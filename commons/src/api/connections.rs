@@ -70,11 +70,21 @@ pub struct DataConnectionType {
 }
 
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Secret {
     pub name: String,
     pub namespace: String,
     pub properties: HashMap<String, String>,
+}
+
+impl std::fmt::Debug for Secret {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Secret")
+            .field("name", &self.name)
+            .field("namespace", &self.namespace)
+            .field("properties", &"[REDACTED]")
+            .finish()
+    }
 }
 
 #[async_trait::async_trait]
