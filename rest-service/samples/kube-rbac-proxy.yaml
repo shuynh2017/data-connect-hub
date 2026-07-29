@@ -2,7 +2,7 @@ authorization:
   endpoints:
     - path: /api/v1/connections/*
       mappings:
-        - methods: [patch, delete]
+        - methods: [get, post,patch, delete]
           resources:
             - rewrites:
                 byHttpHeader:
@@ -10,21 +10,11 @@ authorization:
               resourceAttributes:
                 namespace: "{{.FromHeader}}"
                 apiGroup: dataconnecthub.opendatahub.io
-                resource: data-connections-manage
-                verb: {{.FromMethod}}
-        - methods: [get]
-          resources:
-            - rewrites:
-                byHttpHeader:
-                  name: X-Tenant-Id
-              resourceAttributes:
-                namespace: "{{.FromHeader}}"
-                apiGroup: dataconnecthub.opendatahub.io
-                resource: data-connections-read
+                resource: data-connections
                 verb: {{.FromMethod}}
     - path: /api/v1/connections
       mappings:
-        - methods: [post]
+        - methods: [get, post]
           resources:
             - rewrites:
                 byHttpHeader:
@@ -32,22 +22,13 @@ authorization:
               resourceAttributes:
                 namespace: "{{.FromHeader}}"
                 apiGroup: dataconnecthub.opendatahub.io
-                resource: data-connection-manage
+                resource: data-connection
                 verb: {{.FromMethod}}
-        - methods: [get]
-          resources:
-            - rewrites:
-                byHttpHeader:
-                  name: X-Tenant-Id
-              resourceAttributes:
-                namespace: "{{.FromHeader}}"
-                apiGroup: dataconnecthub.opendatahub.io
-                resource: data-connections-read
-                verb: {{.FromMethod}}
+
 
     - path: /api/v1/connection_types/*
       mappings:
-        - methods: [patch, delete]
+        - methods: [get, post,patch, delete]
           resources:
             - rewrites:
                 byHttpHeader:
@@ -55,21 +36,11 @@ authorization:
               resourceAttributes:
                 namespace: "{{.FromHeader}}"
                 apiGroup: dataconnecthub.opendatahub.io
-                resource: data-connection-types-manage
+                resource: data-connection-types
                 verb: {{.FromMethod}}
-        - methods: [get]
-          resources:
-            - rewrites:
-                byHttpHeader:
-                  name: X-Tenant-Id
-              resourceAttributes:
-                namespace: "{{.FromHeader}}"
-                apiGroup: dataconnecthub.opendatahub.io
-                resource: data-connection-types-read
-                verb: get
     - path: /api/v1/connection_types
       mappings:
-        - methods: [post, patch, delete]
+        - methods: [get, post]
           resources:
             - rewrites:
                 byHttpHeader:
@@ -77,17 +48,5 @@ authorization:
               resourceAttributes:
                 namespace: "{{.FromHeader}}"
                 apiGroup: dataconnecthub.opendatahub.io
-                resource: data-connection-types-manage
+                resource: data-connection-types
                 verb: {{.FromMethod}}
-        - methods: [get]
-          resources:
-            - rewrites:
-                byHttpHeader:
-                  name: X-Tenant-Id
-              resourceAttributes:
-                namespace: "{{.FromHeader}}"
-                apiGroup: dataconnecthub.opendatahub.io
-                resource: data-connections-read
-                verb: get
-
-
