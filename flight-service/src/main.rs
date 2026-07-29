@@ -10,6 +10,7 @@ use flight_service::flight::TabularDataService;
 use flight_service::flight::registry::ConnectorsRegistry;
 use pg_meta_store::store::PgMetaStore;
 use postgres_connector::PgConnector;
+use sqlite_connector::SqliteConnector;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -69,11 +70,13 @@ async fn main() -> Result<()> {
 
     tracing::info!("Starting DataConnectorHub Flight service");
 
-    let connectors_registry = ConnectorsRegistry::new().with_connector(Arc::new(PgConnector::new(
-        Duration::from_secs(config.ingestion_cache_pools.ttl_secs),
-        Duration::from_secs(config.ingestion_cache_pools.idle_secs),
-        config.ingestion_cache_pools.max_capacity,
-    )));
+    let connectors_registry = ConnectorsRegistry::new()
+        .with_connector(Arc::new(PgConnector::new(
+            Duration::from_secs(config.ingestion_cache_pools.ttl_secs),
+            Duration::from_secs(config.ingestion_cache_pools.idle_secs),
+            config.ingestion_cache_pools.max_capacity,
+        )))
+        .with_connector(Arc::new(SqliteConnector::new()));
 
     // TODO: replace with a real kube secret store
     let secret_store = InMemorySecretStore::new(vec![Secret {
@@ -85,7 +88,6 @@ async fn main() -> Result<()> {
         )]),
     }]);
     // ------------------------------------------------------------
-
 
     let addr = format!("{}:{}", config.server.address, config.server.port).parse()?;
     let service = TabularDataService::new(
