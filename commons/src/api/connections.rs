@@ -7,7 +7,7 @@ pub struct Admin {
     pub secret_ref: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct DataConnection {
     pub id: String,
     pub name: String,
@@ -18,10 +18,29 @@ pub struct DataConnection {
     pub created_at: String,
     pub updated_at: String,
     pub properties: HashMap<String, String>,
-    // Skip credentials from serialization. Credentials are loaded from the secret and only kept in memory.
     #[serde(skip)]
     pub credentials: HashMap<String, String>,
 }
+
+impl std::fmt::Debug for DataConnection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DataConnection")
+            .field("id", &self.id)
+            .field("name", &self.name)
+            .field("data_connection_type_id", &self.data_connection_type_id)
+            .field("format", &self.format)
+            .field("tenant_id", &self.tenant_id)
+            .field("admin", &self.admin)
+            .field("created_at", &self.created_at)
+            .field("updated_at", &self.updated_at)
+            .field("properties", &self.properties)
+            .field("credentials", &"[REDACTED]")
+            .finish()
+    }
+}
+
+
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct EnumValue {
     pub value: String,
@@ -49,6 +68,7 @@ pub struct DataConnectionType {
     pub description: Option<String>,
     pub credentials_fields: Vec<Field>,
 }
+
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Secret {
