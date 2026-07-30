@@ -12,11 +12,11 @@ use arrow_flight::{
 use commons::api::connections::{DataConnection, SecretStore};
 use commons::api::{X_DATA_CONNECTION_ID, X_TENANT_ID, connections::MetaStore};
 use futures::TryStreamExt;
-use log::info;
 use prost::Message;
 use prost::bytes::Bytes;
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
+use tracing::info;
 
 pub struct TabularDataService {
     connectors_registry: Arc<ConnectorsRegistry>,
