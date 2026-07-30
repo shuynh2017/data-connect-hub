@@ -34,7 +34,7 @@ impl MetaStore for PgMetaStore {
             .await
             .map_err(|e| MetaStoreError::Query(e.to_string()))?;
 
-        let json_value: serde_json::Value = row.get("data");
+        let json_value: serde_json::Value = row.try_get("data").map_err(|e| MetaStoreError::Query(e.to_string()))?;
         serde_json::from_value(json_value).map_err(|e| MetaStoreError::Serialization(e.to_string()))
     }
 
@@ -47,7 +47,7 @@ impl MetaStore for PgMetaStore {
             .await
             .map_err(|e| MetaStoreError::Query(e.to_string()))?;
 
-        let json_value: serde_json::Value = row.get("data");
+        let json_value: serde_json::Value = row.try_get("data").map_err(|e| MetaStoreError::Query(e.to_string()))?;
         serde_json::from_value(json_value).map_err(|e| MetaStoreError::Serialization(e.to_string()))
     }
 }
