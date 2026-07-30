@@ -28,7 +28,6 @@ futures = { workspace = true }
 prost = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-log = { workspace = true }
 bytes = { workspace = true }
 tokio-stream = { workspace = true }
 clap = { workspace = true }
@@ -39,6 +38,4 @@ thiserror = { workspace = true }
 anyhow = { workspace = true }
 
 [dev-dependencies]
-test-log = { workspace = true, default-features = true, features = ["trace"] }
-env_logger = { workspace = true }
 sqlx = { workspace = true }
