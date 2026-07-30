@@ -22,10 +22,13 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 
 	. "github.com/onsi/ginkgo/v2" // nolint:revive,staticcheck
 )
+
+var sensitivePattern = regexp.MustCompile(`(?i)(Authorization|Bearer|token|password|apikey)[^"'\s]*`)
 
 const (
 	certmanagerVersion = "v1.20.2"
@@ -50,10 +53,11 @@ func Run(cmd *exec.Cmd) (string, error) {
 
 	cmd.Env = append(os.Environ(), "GO111MODULE=on")
 	command := strings.Join(cmd.Args, " ")
-	_, _ = fmt.Fprintf(GinkgoWriter, "running: %q\n", command)
+	redacted := sensitivePattern.ReplaceAllString(command, "$1=***REDACTED***")
+	_, _ = fmt.Fprintf(GinkgoWriter, "running: %q\n", redacted)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return string(output), fmt.Errorf("%q failed with error %q: %w", command, string(output), err)
+		return string(output), fmt.Errorf("%q failed with error %q: %w", redacted, string(output), err)
 	}
 
 	return string(output), nil
