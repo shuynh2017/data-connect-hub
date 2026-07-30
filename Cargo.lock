@@ -1369,6 +1369,8 @@ dependencies = [
  "prost",
  "serde",
  "serde_json",
+ "sqlite-connector",
+ "sqlx",
  "test-log",
  "thiserror",
  "tokio",
@@ -2142,6 +2144,7 @@ version = "0.30.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2e99fb7a497b1e3339bc746195567ed8d3e24945ecd636e3619d20b9de9e9149"
 dependencies = [
+ "cc",
  "pkg-config",
  "vcpkg",
 ]
@@ -3055,6 +3058,20 @@ checksum = "d91ed6c858b01f942cd56b37a94b3e0a1798290327d1236e4d9cf4eaca44d29d"
 dependencies = [
  "base64ct",
  "der",
+]
+
+[[package]]
+name = "sqlite-connector"
+version = "0.1.0"
+dependencies = [
+ "arrow",
+ "async-stream",
+ "async-trait",
+ "commons",
+ "futures",
+ "moka",
+ "sqlx",
+ "tokio",
 ]
 
 [[package]]
