@@ -11,7 +11,7 @@ authorization:
                 namespace: "{{.FromHeader}}"
                 apiGroup: dataconnecthub.opendatahub.io
                 resource: data-connections
-                verb: {{.FromMethod}}
+                verb: "{{.FromMethod}}"
     - path: /api/v1/data/connections
       mappings:
         - methods: [get, post]
@@ -22,8 +22,8 @@ authorization:
               resourceAttributes:
                 namespace: "{{.FromHeader}}"
                 apiGroup: dataconnecthub.opendatahub.io
-                resource: data-connection
-                verb: {{.FromMethod}}
+                resource: data-connections
+                verb: "{{.FromMethod}}"
 
 
     - path: /api/v1/data/connection_types/*
@@ -37,7 +37,7 @@ authorization:
                 namespace: "{{.FromHeader}}"
                 apiGroup: dataconnecthub.opendatahub.io
                 resource: data-connection-types
-                verb: {{.FromMethod}}
+                verb: "{{.FromMethod}}"
     - path: /api/v1/data/connection_types
       mappings:
         - methods: [get, post]
@@ -49,4 +49,4 @@ authorization:
                 namespace: "{{.FromHeader}}"
                 apiGroup: dataconnecthub.opendatahub.io
                 resource: data-connection-types
-                verb: {{.FromMethod}}
+                verb: "{{.FromMethod}}"
