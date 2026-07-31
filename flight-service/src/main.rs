@@ -3,15 +3,14 @@ use crate::utils::ServerConfig;
 use anyhow::Result;
 use arrow_flight::flight_service_server::FlightServiceServer;
 use clap::Parser;
-use commons::api::connections::Secret;
+use commons::api::connections::SecretStore;
 use config::{Config, File};
-use flight_service::flight::InMemorySecretStore;
 use flight_service::flight::TabularDataService;
 use flight_service::flight::registry::ConnectorsRegistry;
+use kube_utils::secrets::KubeSecretStore;
 use pg_meta_store::store::PgMetaStore;
 use postgres_connector::PgConnector;
 use sqlite_connector::SqliteConnector;
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::signal;
@@ -84,16 +83,10 @@ async fn main() -> Result<()> {
         )))
         .with_connector(Arc::new(SqliteConnector::new()));
 
-    // TODO: replace with a real kube secret store
-    let secret_store = InMemorySecretStore::new(vec![Secret {
-        name: "postgres_creds".to_string(),
-        namespace: "default".to_string(),
-        properties: HashMap::from([(
-            "url".to_string(),
-            "postgresql://mdanciu@localhost:5432/mdanciu".to_string(),
-        )]),
-    }]);
-    // ------------------------------------------------------------
+    let secret_store = KubeSecretStore::try_default().await?;
+
+    let secret = secret_store.get_secret("marius", "postgres-creds").await?;
+    tracing::info!("secret: {:?}", secret.properties);
 
     let addr = format!("{}:{}", config.server.address, config.server.port).parse()?;
     let service = TabularDataService::new(

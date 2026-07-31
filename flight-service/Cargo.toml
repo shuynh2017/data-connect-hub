@@ -37,6 +37,7 @@ tracing-subscriber = { workspace = true }
 config = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
+kube-utils = { workspace = true }
 
 [dev-dependencies]
 sqlx = { workspace = true }
