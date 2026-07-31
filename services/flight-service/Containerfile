@@ -34,45 +34,13 @@ ENV PROTOC=/usr/local/bin/protoc
 WORKDIR /src
 
 # ------------------------------------------------------------------------------
-# Cache: copy only manifests + stubs so dependencies compile first
+# Source
 # ------------------------------------------------------------------------------
 
 COPY Cargo.toml Cargo.lock ./
-COPY libs/commons/Cargo.toml ./libs/commons/Cargo.toml
-COPY connectors/postgres/Cargo.toml ./connectors/postgres/Cargo.toml
-COPY connectors/sqlite/Cargo.toml ./connectors/sqlite/Cargo.toml
-COPY services/flight-service/Cargo.toml ./services/flight-service/Cargo.toml
-COPY services/rest-service/Cargo.toml ./services/rest-service/Cargo.toml
-COPY libs/pg-meta-store/Cargo.toml ./libs/pg-meta-store/Cargo.toml
-COPY libs/kube-utils/Cargo.toml ./libs/kube-utils/Cargo.toml
-
-RUN mkdir -p libs/commons/src connectors/postgres/src connectors/sqlite/src services/flight-service/src services/rest-service/src libs/pg-meta-store/src libs/kube-utils/src \
-    && echo '//! stub' > libs/commons/src/lib.rs \
-    && echo '//! stub' > connectors/postgres/src/lib.rs \
-    && echo '//! stub' > connectors/sqlite/src/lib.rs \
-    && echo '//! stub' > services/rest-service/src/lib.rs \
-    && echo '//! stub' > services/flight-service/src/lib.rs \
-    && echo '//! stub' > libs/pg-meta-store/src/lib.rs \
-    && echo '//! stub' > libs/kube-utils/src/lib.rs \
-    && printf '//! stub\nfn main() {}\n' > services/flight-service/src/main.rs
-
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/src/target \
-    cargo build --release -p flight-service
-
-# ------------------------------------------------------------------------------
-# Real source
-# ------------------------------------------------------------------------------
-
-COPY libs/commons/src ./libs/commons/src
-COPY connectors/postgres/src ./connectors/postgres/src
-COPY connectors/sqlite/src ./connectors/sqlite/src
-COPY libs/pg-meta-store/src ./libs/pg-meta-store/src
-COPY libs/kube-utils/src ./libs/kube-utils/src
-COPY services/flight-service/src ./services/flight-service/src
-
-RUN find libs/commons/src connectors/postgres/src connectors/sqlite/src libs/pg-meta-store/src libs/kube-utils/src services/flight-service/src \
-    -name '*.rs' -exec touch {} +
+COPY libs/ ./libs/
+COPY connectors/ ./connectors/
+COPY services/ ./services/
 
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/src/target \
