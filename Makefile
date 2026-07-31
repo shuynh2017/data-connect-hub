@@ -54,21 +54,21 @@ ifndef CONTAINER_ENGINE
 endif
 
 container-flight: | require-container-engine
-	"$(CONTAINER_ENGINE)" build -t "$(IMAGE)-flight:$(VERSION)" -f flight-service/Containerfile .
+	"$(CONTAINER_ENGINE)" build -t "$(IMAGE)-flight:$(VERSION)" -f services/flight-service/Containerfile .
 
 container-rest: | require-container-engine
-	"$(CONTAINER_ENGINE)" build -t "$(IMAGE)-rest:$(VERSION)" -f rest-service/Containerfile .
+	"$(CONTAINER_ENGINE)" build -t "$(IMAGE)-rest:$(VERSION)" -f services/rest-service/Containerfile .
 
 container-all: container-flight container-rest
 
 container-run-flight: | require-container-engine
 	"$(CONTAINER_ENGINE)" run --rm --network=host \
-		-v "$(CURDIR)/flight-service/samples/config.toml:/config/config.toml:ro" \
+		-v "$(CURDIR)/services/flight-service/samples/config.toml:/config/config.toml:ro" \
 		"$(IMAGE)-flight:$(VERSION)" 2>&1
 
 container-run-rest: | require-container-engine
 	"$(CONTAINER_ENGINE)" run --rm --network=host \
-		-v "$(CURDIR)/rest-service/samples/config.toml:/config/config.toml:ro" \
+		-v "$(CURDIR)/services/rest-service/samples/config.toml:/config/config.toml:ro" \
 		"$(IMAGE)-rest:$(VERSION)" 2>&1
 
 # -------------------------------------------------------------------
@@ -105,7 +105,7 @@ audit:
 	cargo audit
 
 check-dco:
-	@bash scripts/check-dco.sh
+	@bash hack/check-dco.sh
 
 # -------------------------------------------------------------------
 # Dev Setup
