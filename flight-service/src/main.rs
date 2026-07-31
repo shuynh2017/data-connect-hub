@@ -3,7 +3,6 @@ use crate::utils::ServerConfig;
 use anyhow::Result;
 use arrow_flight::flight_service_server::FlightServiceServer;
 use clap::Parser;
-use commons::api::connections::SecretStore;
 use config::{Config, File};
 use flight_service::flight::TabularDataService;
 use flight_service::flight::registry::ConnectorsRegistry;
@@ -84,9 +83,6 @@ async fn main() -> Result<()> {
         .with_connector(Arc::new(SqliteConnector::new()));
 
     let secret_store = KubeSecretStore::try_default().await?;
-
-    let secret = secret_store.get_secret("marius", "postgres-creds").await?;
-    tracing::info!("secret: {:?}", secret.properties);
 
     let addr = format!("{}:{}", config.server.address, config.server.port).parse()?;
     let service = TabularDataService::new(
