@@ -27,7 +27,7 @@ impl SecretStore for KubeSecretStore {
         let k8s_secret = api
             .get(name)
             .await
-            .map_err(|_| SecretStoreError::SecretNotFound(format!("Failed to obtain credentials")))?;
+            .map_err(|_| SecretStoreError::SecretNotFound("Failed to obtain credentials".to_string()))?;
 
         let properties = extract_properties(&k8s_secret);
 
