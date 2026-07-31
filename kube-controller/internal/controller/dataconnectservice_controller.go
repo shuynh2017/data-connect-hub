@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
-	dataconnecthubv1alpha1 "github.com/opendatahub-io/data-connect-hub/dch-operator/api/v1alpha1"
+	dataconnecthubv1alpha1 "github.com/opendatahub-io/data-connect-hub/kube-controller/api/v1alpha1"
 )
 
 // DataConnectServiceReconciler reconciles a DataConnectService object

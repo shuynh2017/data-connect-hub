@@ -1,4 +1,4 @@
-module github.com/opendatahub-io/data-connect-hub/dch-operator
+module github.com/opendatahub-io/data-connect-hub/kube-controller
 
 go 1.26.0
 

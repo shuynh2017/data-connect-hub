@@ -27,7 +27,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	dataconnecthubv1alpha1 "github.com/opendatahub-io/data-connect-hub/dch-operator/api/v1alpha1"
+	dataconnecthubv1alpha1 "github.com/opendatahub-io/data-connect-hub/kube-controller/api/v1alpha1"
 )
 
 var _ = Describe("DataConnectService Controller", func() {

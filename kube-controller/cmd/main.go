@@ -35,8 +35,8 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	dataconnecthubv1alpha1 "github.com/opendatahub-io/data-connect-hub/dch-operator/api/v1alpha1"
-	"github.com/opendatahub-io/data-connect-hub/dch-operator/internal/controller"
+	dataconnecthubv1alpha1 "github.com/opendatahub-io/data-connect-hub/kube-controller/api/v1alpha1"
+	"github.com/opendatahub-io/data-connect-hub/kube-controller/internal/controller"
 	// +kubebuilder:scaffold:imports
 )
 

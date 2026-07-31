@@ -2,7 +2,7 @@ apiVersion: dataconnecthub.opendatahub.io/v1alpha1
 kind: DataConnectService
 metadata:
   labels:
-    app.kubernetes.io/name: dch-operator
+    app.kubernetes.io/name: kube-controller
     app.kubernetes.io/managed-by: kustomize
   name: dataconnectservice-sample
 spec:
