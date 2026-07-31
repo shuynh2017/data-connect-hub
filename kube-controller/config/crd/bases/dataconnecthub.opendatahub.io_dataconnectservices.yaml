@@ -50,6 +50,20 @@ spec:
                 format: int32
                 minimum: 0
                 type: integer
+              gateway:
+                description: gateway is an optional reference to a Kubernetes Gateway
+                  for external traffic
+                properties:
+                  name:
+                    description: name is the name of the Gateway resource
+                    type: string
+                  namespace:
+                    description: namespace is the namespace of the Gateway resource
+                    type: string
+                required:
+                - name
+                - namespace
+                type: object
               restApiReplicas:
                 default: 1
                 description: restApiReplicas is the number of replicas for the REST
@@ -122,8 +136,26 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
+              gateway:
+                description: gateway is the Gateway resource this service is attached
+                  to
+                properties:
+                  name:
+                    description: name is the name of the Gateway resource
+                    type: string
+                  namespace:
+                    description: namespace is the namespace of the Gateway resource
+                    type: string
+                required:
+                - name
+                - namespace
+                type: object
               hostname:
                 description: hostname is the hostname where the service is reachable
+                type: string
+              httpRoute:
+                description: httpRoute is the name of the HTTPRoute resource created
+                  for this service
                 type: string
               phase:
                 description: phase represents the current lifecycle phase of the DataConnectService

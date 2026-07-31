@@ -24,6 +24,15 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+// Gateway identifies a Kubernetes Gateway resource by name and namespace.
+type Gateway struct {
+	// name is the name of the Gateway resource
+	Name string `json:"name"`
+
+	// namespace is the namespace of the Gateway resource
+	Namespace string `json:"namespace"`
+}
+
 // DataConnectServiceSpec defines the desired state of DataConnectService
 type DataConnectServiceSpec struct {
 	// description is a human-readable description of the service
@@ -41,6 +50,10 @@ type DataConnectServiceSpec struct {
 	// +kubebuilder:default=1
 	// +optional
 	FlightApiReplicas *int32 `json:"flightApiReplicas,omitempty"`
+
+	// gateway is an optional reference to a Kubernetes Gateway for external traffic
+	// +optional
+	Gateway *Gateway `json:"gateway,omitempty"`
 }
 
 // DataConnectServiceStatus defines the observed state of DataConnectService.
@@ -52,6 +65,14 @@ type DataConnectServiceStatus struct {
 	// hostname is the hostname where the service is reachable
 	// +optional
 	Hostname string `json:"hostname,omitempty"`
+
+	// httpRoute is the name of the HTTPRoute resource created for this service
+	// +optional
+	HttpRoute string `json:"httpRoute,omitempty"`
+
+	// gateway is the Gateway resource this service is attached to
+	// +optional
+	Gateway *Gateway `json:"gateway,omitempty"`
 
 	// conditions represent the current state of the DataConnectService resource.
 	// +listType=map
