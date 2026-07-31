@@ -6,24 +6,30 @@ Data Connect Hub (DCH) is a middleware service that provides a single integratio
 
 ```
 data-connect-hub/
-├── commons/               Shared types and traits
-├── postgres-connector/    PostgreSQL data reader (library)
-├── pg-meta-store/         PostgreSQL metadata store
-├── flight-service/        Arrow Flight gRPC service (binary)
-├── rest-service/          HTTP REST service (binary)
-├── py-tools/              Python tooling and scripts
-├── docs/                  Documentation and proposals
-├── Cargo.toml             Workspace manifest
-├── Makefile               Build, test, lint, container targets
-├── clippy.toml            Clippy configuration
-├── rustfmt.toml           Rustfmt configuration
-└── rust-toolchain.toml    Rust toolchain pinning
+├── services/
+│   ├── flight-service/        Arrow Flight gRPC service (binary)
+│   └── rest-service/          HTTP REST service (binary)
+├── connectors/
+│   ├── postgres/              PostgreSQL data reader (library)
+│   └── sqlite/                SQLite data reader (library)
+├── libs/
+│   ├── commons/               Shared types and traits
+│   ├── pg-meta-store/         PostgreSQL metadata store
+│   └── kube-utils/            Kubernetes utility helpers
+├── config/                    Kustomize deployment configs
+├── hack/                      Scripts and Python tooling
+├── docs/                      Documentation and proposals
+├── Cargo.toml                 Workspace manifest
+├── Makefile                   Build, test, lint, container targets
+├── clippy.toml                Clippy configuration
+├── rustfmt.toml               Rustfmt configuration
+└── rust-toolchain.toml        Rust toolchain pinning
 ```
 
 ## Prerequisites
 
 - Rust 1.96+
-- PostgreSQL (for integration testing, for `make container-run-flight`). The default URL in `flight-service/sample/config.toml` is `"postgresql://dch_user:dch_password@localhost:5432/dch_db"`, so you need to create a user `dch_user`, with `dch_password` as password, and `dch_db` database.
+- PostgreSQL (for integration testing, for `make container-run-flight`). The default URL in `services/flight-service/samples/config.toml` is `"postgresql://dch_user:dch_password@localhost:5432/dch_db"`, so you need to create a user `dch_user`, with `dch_password` as password, and `dch_db` database.
 - Podman or Docker (for container builds)
 
 ## Getting Started
