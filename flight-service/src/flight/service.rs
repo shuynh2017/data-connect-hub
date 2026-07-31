@@ -81,7 +81,6 @@ impl TabularDataService {
                 .await
                 .map_err(|e| Status::internal(e.to_string()))?;
             r.credentials = secret.properties;
-            tracing::info!("credentials: {:?}", r.credentials);
             return Ok(r);
         }
 
