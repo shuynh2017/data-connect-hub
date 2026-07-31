@@ -75,7 +75,7 @@ impl TabularDataService {
                 .get_secret(tenant_id, secret_ref)
                 .await
                 .map_err(|e| Status::internal(e.to_string()))?;
-            r.credentials = secret.properties.clone();
+            r.credentials = secret.properties;
             return Ok(r);
         }
 
