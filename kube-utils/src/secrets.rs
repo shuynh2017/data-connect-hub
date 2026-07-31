@@ -55,13 +55,14 @@ mod tests {
     use k8s_openapi::ByteString;
 
     fn k8s_secret_with_data(data: Vec<(&str, &[u8])>) -> K8sSecret {
-        let mut secret = K8sSecret::default();
-        secret.data = Some(
-            data.into_iter()
-                .map(|(k, v)| (k.to_string(), ByteString(v.to_vec())))
-                .collect(),
-        );
-        secret
+        K8sSecret {
+            data: Some(
+                data.into_iter()
+                    .map(|(k, v)| (k.to_string(), ByteString(v.to_vec())))
+                    .collect(),
+            ),
+            ..Default::default()
+        }
     }
 
     #[test]
@@ -79,10 +80,7 @@ mod tests {
 
     #[test]
     fn test_extract_properties_skips_invalid_utf8() {
-        let k8s = k8s_secret_with_data(vec![
-            ("valid", b"hello"),
-            ("binary", &[0xff, 0xfe, 0xfd]),
-        ]);
+        let k8s = k8s_secret_with_data(vec![("valid", b"hello"), ("binary", &[0xff, 0xfe, 0xfd])]);
 
         let props = extract_properties(&k8s);
         assert_eq!(props.len(), 1);
@@ -92,8 +90,10 @@ mod tests {
 
     #[test]
     fn test_extract_properties_empty_data() {
-        let mut k8s = K8sSecret::default();
-        k8s.data = None;
+        let k8s = K8sSecret {
+            data: None,
+            ..Default::default()
+        };
 
         let props = extract_properties(&k8s);
         assert!(props.is_empty());
