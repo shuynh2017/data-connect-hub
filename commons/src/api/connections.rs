@@ -92,7 +92,7 @@ pub trait MetaStore {
 
 #[async_trait::async_trait]
 pub trait SecretStore {
-    async fn get_secret(&self, namespace: &str, name: &str) -> Result<&Secret, SecretStoreError>;
+    async fn get_secret(&self, namespace: &str, name: &str) -> Result<Secret, SecretStoreError>;
 }
 
 #[cfg(test)]

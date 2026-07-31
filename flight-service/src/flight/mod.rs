@@ -23,9 +23,10 @@ impl InMemorySecretStore {
 
 #[async_trait::async_trait]
 impl SecretStore for InMemorySecretStore {
-    async fn get_secret(&self, namespace: &str, name: &str) -> Result<&Secret, SecretStoreError> {
+    async fn get_secret(&self, namespace: &str, name: &str) -> Result<Secret, SecretStoreError> {
         self.secrets
             .get(format!("{namespace}/{name}").as_str())
+            .cloned()
             .ok_or(SecretStoreError::SecretNotFound(format!(
                 "Secret not found: {namespace}/{name}"
             )))

@@ -60,6 +60,11 @@ impl TabularDataService {
     }
 
     async fn get_connection(&self, tenant_id: &str, connection_id: &str) -> Result<DataConnection, Status> {
+        tracing::info!(
+            "get_connection: tenant_id: {}, connection_id: {}",
+            tenant_id,
+            connection_id
+        );
         let r = self
             .meta_store
             .get_connection(tenant_id, connection_id)
@@ -68,14 +73,14 @@ impl TabularDataService {
 
         if let Ok(mut r) = r {
             let secret_ref = &r.admin.secret_ref;
-
+            tracing::info!("Getting credentials for secret: {}", secret_ref);
             // Hydrate the connection with the secret credentials
             let secret = self
                 .secret_store
                 .get_secret(tenant_id, secret_ref)
                 .await
                 .map_err(|e| Status::internal(e.to_string()))?;
-            r.credentials = secret.properties.clone();
+            r.credentials = secret.properties;
             return Ok(r);
         }
 
