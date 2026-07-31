@@ -1410,6 +1410,7 @@ dependencies = [
  "commons",
  "config",
  "futures",
+ "kube-utils",
  "pg-meta-store",
  "postgres-connector",
  "prost",
