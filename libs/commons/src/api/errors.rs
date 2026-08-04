@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum ApiError {
+pub enum ConnectorError {
     #[error("SQL error: {0}")]
     SQLError(String),
     #[error("Connection error: {0}")]
@@ -18,6 +18,8 @@ pub enum ApiError {
 pub enum MetaStoreError {
     #[error("Connection error: {0}")]
     Connection(String),
+    #[error("Not found: {0}")]
+    ResourceNotFound(String),
     #[error("Invalid request: {0}")]
     InvalidRequest(String),
     #[error("Config error: {0}")]
