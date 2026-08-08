@@ -1,5 +1,6 @@
 use chrono::Utc;
 use commons::api::ResourceMetadata;
+use commons::api::connections::Admin;
 use commons::api::connections::{
     DataConnection, DataConnectionResource, DataConnectionType, DataConnectionTypeResource, MetaStore,
 };
@@ -26,6 +27,15 @@ impl PgMetaStore {
                 .map_err(|e| MetaStoreError::Connection(e.to_string()))?,
         })
     }
+
+    async fn can_store(data_connection: &DataConnection) -> Result<(), MetaStoreError> {
+        if let Some(Admin::Secret { .. }) = &data_connection.admin {
+            return Err(MetaStoreError::Validation(
+                "A plain secret cannot be stored in the database, use a secret reference instead".to_string(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 #[async_trait::async_trait]
@@ -50,6 +60,8 @@ impl MetaStore for PgMetaStore {
         tenant_id: &str,
         data_connection: DataConnection,
     ) -> Result<DataConnectionResource, MetaStoreError> {
+        Self::can_store(&data_connection).await?;
+
         let now = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
         let resource = DataConnectionResource {
             metadata: ResourceMetadata {
@@ -99,6 +111,9 @@ impl MetaStore for PgMetaStore {
             serde_json::from_value(json_value).map_err(|e| MetaStoreError::Deserialization(e.to_string()))?;
 
         let data_connection = update_fn(existing.resource)?;
+
+        Self::can_store(&data_connection).await?;
+
         let now = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
 
         let resource = DataConnectionResource {

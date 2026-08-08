@@ -4,6 +4,7 @@ use arrow::array::{Array, StringArray};
 use arrow_flight::{flight_service_server::FlightServiceServer, sql::client::FlightSqlServiceClient};
 use commons::api::ResourceMetadata;
 use commons::api::connections::DataConnectionResource;
+use commons::api::connections::DataFormat;
 use commons::api::connections::{
     Admin, DataConnection, DataConnectionType, DataConnectionTypeResource, MetaStore, Secret,
 };
@@ -17,6 +18,7 @@ use sqlx::SqlitePool;
 use std::collections::HashMap;
 use tokio::net::TcpListener;
 use tonic::transport::{Channel, Server};
+
 struct TestMetaStore;
 
 #[async_trait::async_trait]
@@ -36,14 +38,11 @@ impl MetaStore for TestMetaStore {
             resource: DataConnection {
                 name: "test-db".to_string(),
                 data_connection_type_id: "sqlite".to_string(),
-                format: "tabular".to_string(),
-                admin: Admin {
+                format: DataFormat::Tabular,
+                admin: Some(Admin::SecretRef {
                     secret_ref: "sqlite_creds".to_string(),
-                },
-                created_at: "2026-07-21T00:00:00Z".to_string(),
-                updated_at: "2026-07-21T00:00:00Z".to_string(),
+                }),
                 properties: HashMap::new(),
-                credentials: HashMap::new(),
             },
         })
     }
