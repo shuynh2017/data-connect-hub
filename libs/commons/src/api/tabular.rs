@@ -38,6 +38,8 @@ pub trait TabularReader: Send + Sync {
     async fn schema(&self, query: &str) -> Result<Arc<TabularState>, ConnectorError>;
 
     async fn read(&self, state: Arc<TabularState>, options: &QueryOptions) -> QueryOutput;
+
+    async fn test_connection(&self) -> Result<(), ConnectorError>;
 }
 
 #[async_trait::async_trait]
