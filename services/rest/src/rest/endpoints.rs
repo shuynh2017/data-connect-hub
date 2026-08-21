@@ -1,5 +1,7 @@
 use super::errors::EndpointError;
 use super::errors::RestErrorResponse;
+use crate::clients::flight::FlightClient;
+use crate::state::audit::audit_data_connection_types;
 use crate::utils::transform_data_connection;
 use actix_web::{HttpResponse, web};
 use commons::api::connection_types::DataConnectionType;
@@ -24,13 +26,19 @@ struct HealthResponse {
 pub struct ApiService {
     meta_store: Arc<dyn MetaStore + Send + Sync>,
     secret_store: Arc<dyn SecretStore + Send + Sync>,
+    flight_client: FlightClient,
 }
 
 impl ApiService {
-    pub fn new(meta_store: Arc<dyn MetaStore + Send + Sync>, secret_store: Arc<dyn SecretStore + Send + Sync>) -> Self {
+    pub fn new(
+        meta_store: Arc<dyn MetaStore + Send + Sync>,
+        secret_store: Arc<dyn SecretStore + Send + Sync>,
+        flight_client: FlightClient,
+    ) -> Self {
         Self {
             meta_store,
             secret_store,
+            flight_client,
         }
     }
 }
@@ -216,6 +224,12 @@ pub async fn get_ingestion_data(
     Err(EndpointError::Unimplemented.into())
 }
 
+pub async fn audit_connection_types(service: web::Data<ApiService>) -> Result<HttpResponse, RestErrorResponse> {
+    info!("audit_connection_types");
+    audit_data_connection_types(service.meta_store.clone(), &service.flight_client).await?;
+    Ok(HttpResponse::Accepted().finish())
+}
+
 pub async fn not_found() -> Result<HttpResponse, RestErrorResponse> {
     Err(EndpointError::PathNotFound.into())
 }
@@ -354,6 +368,12 @@ mod tests {
             })
         }
 
+        async fn get_all_data_connection_types(
+            &self,
+        ) -> Result<ResourceList<DataConnectionTypeResource>, commons::api::errors::MetaStoreError> {
+            unimplemented!()
+        }
+
         async fn get_data_connection_type(
             &self,
             tenant_id: &str,
@@ -434,6 +454,23 @@ mod tests {
             }
         }
 
+        async fn update_data_connection_type_status(
+            &self,
+            _uid: &str,
+            _update_fn: Arc<
+                dyn Fn(
+                        commons::api::connection_types::DataConnectionTypeStatus,
+                    ) -> Result<
+                        commons::api::connection_types::DataConnectionTypeStatus,
+                        commons::api::errors::MetaStoreError,
+                    > + Send
+                    + Sync,
+            >,
+        ) -> Result<commons::api::connection_types::DataConnectionTypeResource, commons::api::errors::MetaStoreError>
+        {
+            unimplemented!()
+        }
+
         async fn delete_data_connection_type(
             &self,
             tenant_id: &str,
@@ -473,7 +510,11 @@ mod tests {
     }
 
     fn test_service() -> web::Data<ApiService> {
-        web::Data::new(ApiService::new(Arc::new(StubMetaStore), Arc::new(StubSecretStore)))
+        web::Data::new(ApiService::new(
+            Arc::new(StubMetaStore),
+            Arc::new(StubSecretStore),
+            FlightClient::new("http://localhost:50051".to_string()),
+        ))
     }
 
     fn test_app_config(cfg: &mut web::ServiceConfig) {
