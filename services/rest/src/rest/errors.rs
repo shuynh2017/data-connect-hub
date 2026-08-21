@@ -37,6 +37,8 @@ pub enum ValidationError {
     InvalidSecret,
     #[error("Missing required key: {0}")]
     MissingRequiredKey(String),
+    #[error("{0}")]
+    UnsupportedProvider(String),
     #[error("Flight service error: {0}")]
     FlightServiceError(String),
 }
@@ -195,6 +197,11 @@ impl From<ValidationError> for RestErrorResponse {
                 code: "flight_service_error".to_string(),
                 message: error,
                 status: 500,
+            },
+            ValidationError::UnsupportedProvider(message) => RestErrorResponse {
+                code: "unsupported_provider".to_string(),
+                message,
+                status: 400,
             },
         }
     }

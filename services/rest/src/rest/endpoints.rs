@@ -1,10 +1,12 @@
 use super::errors::EndpointError;
 use super::errors::RestErrorResponse;
+use super::errors::ValidationError;
 use crate::clients::flight::FlightClient;
 use crate::state::audit::audit_data_connection_types;
 use crate::utils::transform_data_connection;
 use actix_web::{HttpResponse, web};
 use commons::api::connection_types::DataConnectionType;
+use commons::api::connection_types::Provider;
 use commons::api::connections::DataConnection;
 use commons::api::storage::MetaStore;
 use commons::api::storage::SecretStore;
@@ -150,12 +152,27 @@ pub async fn patch_connection(
     Ok(HttpResponse::Ok().json(connection))
 }
 
+/// validate_provider rejects a provider identifier that is not one of the
+/// [`Provider`] variants known to Data Connect Hub.
+fn validate_provider(provider: &str) -> Result<(), ValidationError> {
+    if Provider::from_id(provider).is_some() {
+        Ok(())
+    } else {
+        let supported = Provider::ALL.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(", ");
+        Err(ValidationError::UnsupportedProvider(format!(
+            "unsupported provider '{provider}'; supported providers are: {supported}"
+        )))
+    }
+}
+
 pub async fn create_connection_type(
     service: web::Data<ApiService>,
     ctx: web::ReqData<ApiContext>,
     connection_type: web::Json<DataConnectionType>,
 ) -> Result<HttpResponse, RestErrorResponse> {
     info!("create_connection_type: for tenant {:?}", ctx.tenant_id);
+
+    validate_provider(&connection_type.provider)?;
 
     let connection_type = service
         .meta_store
@@ -174,6 +191,10 @@ pub async fn patch_connection_type(
     info!("patch_connection_type: for tenant {:?}", ctx.tenant_id);
     let id = id.into_inner();
     let patch = body.into_inner();
+
+    if let Some(provider) = patch.get("provider").and_then(|v| v.as_str()) {
+        validate_provider(provider)?;
+    }
 
     let update_fn = Arc::new(move |ct: DataConnectionType| {
         let mut value = serde_json::to_value(&ct)
@@ -816,6 +837,53 @@ mod tests {
         assert_eq!(body["metadata"]["tenant_id"], "test-tenant");
         assert_eq!(body["resource"]["name"], "PostgreSQL");
         assert_eq!(body["resource"]["provider"], "postgres");
+    }
+
+    #[actix_web::test]
+    async fn test_create_connection_type_unsupported_provider() {
+        let app = test::init_service(
+            App::new()
+                .app_data(test_service())
+                .app_data(json_config())
+                .configure(test_app_config),
+        )
+        .await;
+        let req = test::TestRequest::post()
+            .uri("/api/v1/data/connection-types")
+            .insert_header(("x-tenant-id", "test-tenant"))
+            .insert_header(("content-type", "application/json"))
+            .set_json(serde_json::json!({
+                "name": "Bogus",
+                "provider": "bogus",
+                "credentials_fields": []
+            }))
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+
+        assert_eq!(resp.status(), 400);
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["code"], "unsupported_provider");
+    }
+
+    #[actix_web::test]
+    async fn test_patch_connection_type_unsupported_provider() {
+        let app = test::init_service(
+            App::new()
+                .app_data(test_service())
+                .app_data(json_config())
+                .configure(test_app_config),
+        )
+        .await;
+        let req = test::TestRequest::patch()
+            .uri("/api/v1/data/connection-types/ct-1")
+            .insert_header(("x-tenant-id", "test-tenant"))
+            .set_json(serde_json::json!({"provider": "bogus"}))
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+
+        assert_eq!(resp.status(), 400);
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["code"], "unsupported_provider");
     }
 
     #[actix_web::test]
