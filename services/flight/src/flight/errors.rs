@@ -28,7 +28,7 @@ pub(crate) fn map_meta_store_error(e: MetaStoreError) -> Status {
         },
         e @ MetaStoreError::Deserialization(_) => {
             tracing::error!(error = %e, "metadata deserialization failed");
-            Status::internal("metadata deserialization error")
+            Status::internal("metadata deserialization error; see service logs for details")
         },
     }
 }
