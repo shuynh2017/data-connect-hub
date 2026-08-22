@@ -70,7 +70,7 @@ impl PgMetaStore {
             .await
             .map_err(|e| match e {
                 sqlx::Error::RowNotFound => {
-                    MetaStoreError::ResourceNotFound(format!("connection type '{connection_type_id}' not found"))
+                    MetaStoreError::UnprocessableEntity(format!("connection type '{connection_type_id}' not found"))
                 }
                 e => {
                     error!("failed to validate connection type '{connection_type_id}': {e}");
