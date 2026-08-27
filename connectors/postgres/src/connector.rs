@@ -6,14 +6,15 @@ use arrow::array::{
 };
 use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
 use arrow::record_batch::RecordBatch;
-use commons::api::connections::{Admin, DataConnectionResource};
+use commons::api::connections::DataConnectionResource;
+use commons::api::connector::{DataReader, QueryOutput, TableInfo};
+use commons::api::connector::{Query, QueryOptions};
 use commons::api::errors::ConnectorError;
-use commons::api::tabular::{QueryOptions, TabularState};
-use commons::api::tabular::{QueryOutput, TableInfo, TabularReader};
 
 use futures::StreamExt;
 
-use commons::api::tabular::FlightConnector;
+use commons::api::connector::CredentialsResolver;
+use commons::api::connector::FlightConnector;
 use commons::utils::config::ConnectorConfig;
 use moka::future::Cache;
 use sqlx::Acquire;
@@ -39,6 +40,8 @@ pub struct PgConnector {
     config: ConnectorConfig,
 }
 
+const PROVIDER: &str = "postgres";
+
 impl PgConnector {
     pub fn new(cache_ttl: Duration, cache_idle: Duration, cache_max_capacity: u64, config: ConnectorConfig) -> Self {
         Self {
@@ -51,9 +54,6 @@ impl PgConnector {
         }
     }
 }
-
-const PROVIDER: &str = "postgres";
-
 #[async_trait::async_trait]
 impl FlightConnector for PgConnector {
     fn provider(&self) -> String {
@@ -66,33 +66,22 @@ impl FlightConnector for PgConnector {
 
     async fn get_reader(
         &self,
-        enable_cache: bool,
         data_connection: &DataConnectionResource,
-    ) -> Result<Arc<dyn TabularReader>, ConnectorError> {
+        credentials_resolver: &dyn CredentialsResolver,
+    ) -> Result<Arc<dyn DataReader>, ConnectorError> {
         info!("Creating Postgres reader");
 
-        let credentials = match &data_connection.resource.admin {
-            Some(Admin::Secret { name: _, secret }) => Some(secret.clone()),
-            _ => None,
-        }
-        .ok_or_else(|| ConnectorError::ConnectionError("PostgreSQL credentials are required".to_string()))?;
-
-        let url = credentials
-            .get(KEY_URI)
-            .ok_or_else(|| ConnectorError::ConnectionError("PostgreSQL URL is required".to_string()))?;
-
-        if !enable_cache {
-            return Ok(Arc::new(PgReader {
-                pool: PgPool::connect(url.as_str())
-                    .await
-                    .map_err(|_| ConnectorError::ConnectionError("Failed to connect to PostgreSQL".to_string()))?,
-            }));
-        }
-
         let connection_timeout = self.config.connection_timeout();
+        let cache_key = data_connection.metadata.id.clone();
+
         let pool = self
             .pools
-            .try_get_with(url.clone(), async {
+            .try_get_with(cache_key, async {
+                let credentials = credentials_resolver.resolve(data_connection).await?;
+                let url = credentials
+                    .get(KEY_URI)
+                    .ok_or_else(|| ConnectorError::ConnectionError("PostgreSQL URL is required".to_string()))?;
+
                 sqlx::pool::PoolOptions::<sqlx::Postgres>::new()
                     .acquire_timeout(connection_timeout)
                     .connect(url.as_str())
@@ -113,12 +102,12 @@ pub struct PgReader {
 impl PgReader {}
 
 #[async_trait::async_trait]
-impl TabularReader for PgReader {
+impl DataReader for PgReader {
     fn provider(&self) -> String {
         PROVIDER.to_string()
     }
 
-    async fn schema(&self, query: &str) -> Result<Arc<TabularState>, ConnectorError> {
+    async fn schema(&self, query: &str) -> Result<Arc<Query>, ConnectorError> {
         let statement = self.pool.prepare(query).await.map_err(map_sqlx_error)?;
 
         let fields: Vec<Field> = statement
@@ -127,16 +116,13 @@ impl TabularReader for PgReader {
             .map(|col| Field::new(col.name(), pg_type_to_arrow(col.type_info().name()), true))
             .collect();
 
-        Ok(Arc::new(TabularState::new(
-            query.to_owned(),
-            Arc::new(Schema::new(fields)),
-        )))
+        Ok(Arc::new(Query::new(query.to_owned(), Arc::new(Schema::new(fields)))))
     }
 
-    async fn read(&self, state: Arc<TabularState>, options: &QueryOptions) -> QueryOutput {
+    async fn read_tabular(&self, query: Arc<Query>, options: &QueryOptions) -> QueryOutput {
         let pool = self.pool.clone();
-        let schema = state.schema.clone();
-        let query = state.query.clone();
+        let schema = query.schema.clone();
+        let query = query.query.clone();
         let batch_size = options.batch_size;
 
         let stream = async_stream::try_stream! {

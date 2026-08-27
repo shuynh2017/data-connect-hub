@@ -2,20 +2,20 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::query::UriRequest;
+use crate::types;
 use arrow::array::{
     ArrayRef, BooleanArray, Float32Array, Float64Array, Int8Array, Int16Array, Int32Array, Int64Array, StringArray,
     TimestampMillisecondArray,
 };
 use arrow::datatypes::{DataType as ArrowDataType, Schema, TimeUnit};
 use arrow::record_batch::RecordBatch;
-use commons::api::connections::{Admin, DataConnectionResource};
+use commons::api::connections::DataConnectionResource;
+use commons::api::connector::CredentialsResolver;
+use commons::api::connector::{DataReader, FlightConnector, Query, QueryOptions, QueryOutput};
 use commons::api::errors::ConnectorError;
-use commons::api::tabular::{FlightConnector, QueryOptions, QueryOutput, TabularReader, TabularState};
 use commons::utils::config::ConnectorConfig;
 use moka::future::Cache;
-
-use crate::query::UriRequest;
-use crate::types;
 
 const KEY_URI: &str = "URI";
 const KEY_TOKEN: &str = "TOKEN";
@@ -77,17 +77,6 @@ impl UriConnector {
                 .build(),
             config,
         }
-    }
-}
-
-fn extract_credentials(
-    data_connection: &DataConnectionResource,
-) -> Result<Arc<HashMap<String, String>>, ConnectorError> {
-    match &data_connection.resource.admin {
-        Some(Admin::Secret { name: _, secret }) => Ok(secret.clone()),
-        _ => Err(ConnectorError::ConnectionError(
-            "URI credentials are required".to_string(),
-        )),
     }
 }
 
@@ -153,24 +142,18 @@ impl FlightConnector for UriConnector {
 
     async fn get_reader(
         &self,
-        enable_cache: bool,
         data_connection: &DataConnectionResource,
-    ) -> Result<Arc<dyn TabularReader>, ConnectorError> {
-        let credentials = extract_credentials(data_connection)?;
-        let cache_key = data_connection.metadata.id.clone();
+        credentials_resolver: &dyn CredentialsResolver,
+    ) -> Result<Arc<dyn DataReader>, ConnectorError> {
         let connection_timeout = self.config.connection_timeout();
-
-        if !enable_cache {
-            let client = build_client(&credentials, connection_timeout)?;
-            return Ok(Arc::new(UriReader {
-                client,
-                cached_response: tokio::sync::Mutex::new(None),
-            }));
-        }
+        let cache_key = data_connection.metadata.id.clone();
 
         let client = self
             .clients
-            .try_get_with(cache_key, async { build_client(&credentials, connection_timeout) })
+            .try_get_with(cache_key, async {
+                let credentials = credentials_resolver.resolve(data_connection).await?;
+                build_client(&credentials, connection_timeout)
+            })
             .await
             .map_err(|e| ConnectorError::ConnectionError(format!("Failed to get URI client: {e}")))?;
 
@@ -233,12 +216,12 @@ async fn fetch_json(client: &UriClient, request: &UriRequest) -> Result<serde_js
 }
 
 #[async_trait::async_trait]
-impl TabularReader for UriReader {
+impl DataReader for UriReader {
     fn provider(&self) -> String {
         PROVIDER.to_string()
     }
 
-    async fn schema(&self, query: &str) -> Result<Arc<TabularState>, ConnectorError> {
+    async fn schema(&self, query: &str) -> Result<Arc<Query>, ConnectorError> {
         let request = UriRequest::parse(query)?;
         let response_json = fetch_json(&self.client, &request).await?;
         let rows = types::extract_rows(&response_json, request.data_path.as_deref())?;
@@ -249,12 +232,12 @@ impl TabularReader for UriReader {
 
         let schema = types::infer_schema(rows);
         *self.cached_response.lock().await = Some(response_json);
-        Ok(Arc::new(TabularState::new(query.to_owned(), Arc::new(schema))))
+        Ok(Arc::new(Query::new(query.to_owned(), Arc::new(schema))))
     }
 
-    async fn read(&self, state: Arc<TabularState>, options: &QueryOptions) -> QueryOutput {
-        let request = UriRequest::parse(&state.query)?;
-        let schema = state.schema.clone();
+    async fn read_tabular(&self, view: Arc<Query>, options: &QueryOptions) -> QueryOutput {
+        let request = UriRequest::parse(&view.query)?;
+        let schema = view.schema.clone();
         let client = self.client.clone();
         let batch_size = options.batch_size;
         let cached = self.cached_response.lock().await.take();
@@ -406,53 +389,6 @@ mod tests {
             ConnectorConfig::default(),
         );
         assert_eq!(connector.provider(), "uri");
-    }
-
-    #[test]
-    fn test_extract_credentials_success() {
-        let conn = DataConnectionResource {
-            metadata: commons::api::ResourceMetadata {
-                id: "conn-1".to_string(),
-                tenant_id: Some("t-1".to_string()),
-                created_at: "2026-01-01T00:00:00Z".to_string(),
-                updated_at: "2026-01-01T00:00:00Z".to_string(),
-            },
-            resource: commons::api::connections::DataConnection {
-                name: "test-uri".to_string(),
-                data_connection_type_id: "uri-type".to_string(),
-                format: commons::api::connections::DataFormat::Tabular,
-                admin: Some(Admin::Secret {
-                    name: "test-uri".to_string(),
-                    secret: Arc::new(HashMap::from([(KEY_URI.to_string(), "http://example.com".to_string())])),
-                }),
-                properties: HashMap::new(),
-            },
-            status: Default::default(),
-        };
-        let result = extract_credentials(&conn);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap().get(KEY_URI).unwrap(), "http://example.com");
-    }
-
-    #[test]
-    fn test_extract_credentials_missing() {
-        let conn = DataConnectionResource {
-            metadata: commons::api::ResourceMetadata {
-                id: "conn-1".to_string(),
-                tenant_id: Some("t-1".to_string()),
-                created_at: "2026-01-01T00:00:00Z".to_string(),
-                updated_at: "2026-01-01T00:00:00Z".to_string(),
-            },
-            resource: commons::api::connections::DataConnection {
-                name: "test-uri".to_string(),
-                data_connection_type_id: "uri-type".to_string(),
-                format: commons::api::connections::DataFormat::Tabular,
-                admin: None,
-                properties: HashMap::new(),
-            },
-            status: Default::default(),
-        };
-        assert!(extract_credentials(&conn).is_err());
     }
 
     #[test]
