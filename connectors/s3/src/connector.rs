@@ -3,12 +3,15 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::format::{self, FileFormat};
-use arrow::datatypes::Schema;
+use arrow::array::BinaryArray;
+use arrow::datatypes::{DataType, Field, Schema};
+use arrow::record_batch::RecordBatch;
 use commons::api::connections::DataConnectionResource;
-use commons::api::connector::CredentialsResolver;
+use commons::api::connector::{BinaryQuery, CredentialsResolver};
 use commons::api::connector::{DataReader, FlightConnector, Query, QueryOptions, QueryOutput, TableInfo};
 use commons::api::errors::ConnectorError;
 use commons::utils::config::ConnectorConfig;
+use futures::TryStreamExt;
 use moka::future::Cache;
 use opendal::{EntryMode, Operator, Reader, layers::TimeoutLayer, services::S3};
 
@@ -107,13 +110,18 @@ impl FlightConnector for S3Connector {
             .map_err(|e| ConnectorError::ConnectionError(format!("Failed to get S3 operator: {e}")))?;
 
         let format_hint = data_connection.resource.properties.get("format").cloned();
-        Ok(Arc::new(S3Reader { operator, format_hint }))
+        Ok(Arc::new(S3Reader {
+            operator,
+            format_hint,
+            config: self.config,
+        }))
     }
 }
 
 pub struct S3Reader {
     operator: Operator,
     format_hint: Option<String>,
+    config: ConnectorConfig,
 }
 
 impl S3Reader {
@@ -124,7 +132,8 @@ impl S3Reader {
     async fn make_reader(&self, path: &str) -> Result<Reader, ConnectorError> {
         let reader = self
             .operator
-            .reader(path)
+            .reader_with(path)
+            .chunk(self.config.chunk_size)
             .await
             .map_err(|e| ConnectorError::IOError(format!("Failed to create S3 reader for '{path}': {e}")))?;
         Ok(reader)
@@ -168,6 +177,40 @@ impl DataReader for S3Reader {
                 format::read_jsonl_batches(reader, &view.schema, batch_size).await
             },
         }
+    }
+
+    async fn can_read_binary(&self, query: Arc<BinaryQuery>) -> Result<(), ConnectorError> {
+        self.operator
+            .stat(&query.path)
+            .await
+            .map_err(|e| ConnectorError::IOError(format!("Cannot read '{}': {e}", query.path)))?;
+        Ok(())
+    }
+
+    async fn read_binary(&self, query: Arc<BinaryQuery>) -> QueryOutput {
+        let reader = self.make_reader(&query.path).await?;
+        let schema = Arc::new(Schema::new(vec![Field::new("data", DataType::Binary, false)]));
+
+        let mut buf_stream = reader
+            .into_stream(..)
+            .await
+            .map_err(|e| ConnectorError::IOError(format!("Failed to open stream for '{}': {e}", query.path)))?;
+
+        let stream = async_stream::try_stream! {
+            while let Some(buf) = buf_stream
+                .try_next()
+                .await
+                .map_err(|e| ConnectorError::IOError(format!("Stream read error: {e}")))?
+            {
+                let chunk = buf.to_bytes();
+                let array = BinaryArray::from_vec(vec![&chunk]);
+                let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)])
+                    .map_err(|e| ConnectorError::IOError(format!("Failed to create batch: {e}")))?;
+                yield batch;
+            }
+        };
+
+        Ok(Box::pin(stream))
     }
 
     async fn check_connection(&self) -> Result<(), ConnectorError> {
@@ -262,6 +305,7 @@ fn sql_like_match(value: &str, pattern: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use arrow::array::Array;
 
     fn make_credentials() -> Arc<HashMap<String, String>> {
         Arc::new(HashMap::from([
@@ -328,6 +372,7 @@ mod tests {
         let reader = S3Reader {
             operator: build_operator(&make_credentials(), Duration::from_secs(10)).unwrap(),
             format_hint: None,
+            config: ConnectorConfig::default(),
         };
         assert_eq!(reader.detect_format("data/file.parquet").unwrap(), FileFormat::Parquet);
         assert_eq!(reader.detect_format("data/file.csv").unwrap(), FileFormat::Csv);
@@ -340,12 +385,14 @@ mod tests {
         let reader = S3Reader {
             operator: build_operator(&make_credentials(), Duration::from_secs(10)).unwrap(),
             format_hint: Some("parquet".to_string()),
+            config: ConnectorConfig::default(),
         };
         assert_eq!(reader.detect_format("data/no-extension").unwrap(), FileFormat::Parquet);
 
         let reader = S3Reader {
             operator: build_operator(&make_credentials(), Duration::from_secs(10)).unwrap(),
             format_hint: Some("jsonl".to_string()),
+            config: ConnectorConfig::default(),
         };
         assert_eq!(
             reader.detect_format("data/no-extension").unwrap(),
@@ -377,5 +424,57 @@ mod tests {
     fn test_sql_like_combined() {
         assert!(!sql_like_match("data/cities.parquet", "%/_.parquet"));
         assert!(sql_like_match("data/x.parquet", "%/_.parquet"));
+    }
+
+    #[tokio::test]
+    async fn test_can_read_binary_exists() {
+        let op = Operator::new(opendal::services::Memory::default()).unwrap();
+        op.write("data/model.bin", vec![1u8, 2, 3]).await.unwrap();
+        let reader = S3Reader {
+            operator: op,
+            format_hint: None,
+            config: ConnectorConfig::default(),
+        };
+        let query = Arc::new(BinaryQuery::new("data/model.bin".to_string()));
+        assert!(reader.can_read_binary(query).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_can_read_binary_not_found() {
+        let op = Operator::new(opendal::services::Memory::default()).unwrap();
+        let reader = S3Reader {
+            operator: op,
+            format_hint: None,
+            config: ConnectorConfig::default(),
+        };
+        let query = Arc::new(BinaryQuery::new("does/not/exist.bin".to_string()));
+        assert!(reader.can_read_binary(query).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_read_binary_streams_data() {
+        let data = b"hello binary world".to_vec();
+        let op = Operator::new(opendal::services::Memory::default()).unwrap();
+        op.write("test.bin", data.clone()).await.unwrap();
+        let reader = S3Reader {
+            operator: op,
+            format_hint: None,
+            config: ConnectorConfig::default(),
+        };
+        let query = Arc::new(BinaryQuery::new("test.bin".to_string()));
+        let stream = reader.read_binary(query).await.unwrap();
+
+        let batches: Vec<_> = stream.try_collect().await.unwrap();
+        assert!(!batches.is_empty());
+
+        let mut result = Vec::new();
+        for batch in &batches {
+            assert_eq!(batch.num_columns(), 1);
+            let col = batch.column(0).as_any().downcast_ref::<BinaryArray>().unwrap();
+            for i in 0..col.len() {
+                result.extend_from_slice(col.value(i));
+            }
+        }
+        assert_eq!(result, data);
     }
 }
