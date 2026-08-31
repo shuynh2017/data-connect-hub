@@ -2,20 +2,22 @@ use super::errors::EndpointError;
 use super::errors::RestErrorResponse;
 use super::errors::ValidationError;
 use crate::clients::flight::FlightClient;
-use crate::rest::update_connection_type_status;
+use crate::state::audit::audit_connection_type;
+use crate::state::audit::audit_data_connection;
 use crate::state::audit::audit_data_connection_types;
 use crate::utils::transform_data_connection;
 use actix_web::{HttpResponse, web};
-use chrono::Utc;
 use commons::api::connection_types::DataConnectionType;
-use commons::api::connections::{DataConnection, DataConnectionState, DataConnectionStatus};
+use commons::api::connections::DataConnection;
 use commons::api::creds::TestCredentials;
 use commons::api::storage::MetaStore;
 use commons::api::storage::SecretStore;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tracing::error;
 use tracing::info;
+
 #[derive(Clone)]
 pub struct ApiContext {
     pub tenant_id: String,
@@ -82,14 +84,18 @@ pub async fn create_connection(
     info!("create_connection: for tenant {:?}", ctx.tenant_id);
     let tenant_id = ctx.tenant_id.clone();
 
-    let connection = transform_data_connection(&tenant_id, &connection).await;
+    let (connection, secret) = transform_data_connection(&tenant_id, &connection).await;
 
-    let connection_res = service
-        .meta_store
-        .create_data_connection(ctx.tenant_id.as_str(), &connection.0)
-        .await?;
+    if let Some(secret) = &secret {
+        let dct = service
+            .meta_store
+            .get_data_connection_type(ctx.tenant_id.as_str(), &connection.data_connection_type_id)
+            .await?;
 
-    if let Some(secret) = connection.1 {
+        dct.resource
+            .check_credentials_schema(&secret.properties)
+            .map_err(|e| ValidationError::CredentialsCheckFailed(e.to_string()))?;
+
         let secret = &mut secret.clone();
         secret.labels = Arc::new(HashMap::from([(
             "dataconnecthub.opendatahub.io/attached".to_string(),
@@ -99,7 +105,23 @@ pub async fn create_connection(
         service.secret_store.create_secret(secret).await?;
     }
 
-    Ok(HttpResponse::Created().json(connection_res))
+    let connection_res = service
+        .meta_store
+        .create_data_connection(ctx.tenant_id.as_str(), &connection)
+        .await;
+
+    match connection_res {
+        Ok(connection_res) => Ok(HttpResponse::Created().json(connection_res)),
+        Err(e) => {
+            if let Some(secret) = secret {
+                let res = service.secret_store.delete_secret(&tenant_id, &secret.name).await;
+                if let Err(e) = res {
+                    error!("Failed to delete secret: {:?}", e);
+                }
+            }
+            Err(e.into())
+        },
+    }
 }
 
 pub async fn list_connection_types(
@@ -165,7 +187,7 @@ pub async fn create_connection_type(
         .create_data_connection_type(ctx.tenant_id.as_str(), &connection_type)
         .await?;
 
-    update_connection_type_status(&service.flight_client, &service.meta_store, connection_type.clone()).await?;
+    audit_connection_type(&service.flight_client, &service.meta_store, connection_type.clone()).await?;
 
     Ok(HttpResponse::Created().json(connection_type))
 }
@@ -192,7 +214,7 @@ pub async fn patch_connection_type(
         .update_data_connection_type(ctx.tenant_id.as_str(), id.as_str(), update_fn)
         .await?;
 
-    update_connection_type_status(&service.flight_client, &service.meta_store, connection_type.clone()).await?;
+    audit_connection_type(&service.flight_client, &service.meta_store, connection_type.clone()).await?;
 
     Ok(HttpResponse::Ok().json(connection_type))
 }
@@ -245,46 +267,16 @@ pub async fn check_existent_connection(
     info!("check_existent_connection: for tenant {:?}", ctx.tenant_id);
 
     let connection_id = id.into_inner();
+    let tenant_id = ctx.tenant_id.clone();
 
-    let result = service
-        .flight_client
-        .check_connection(&ctx.tenant_id, &connection_id)
-        .await;
-
-    match result {
-        Ok(_) => {
-            let update_fn = Arc::new(|_: DataConnectionStatus| {
-                let now = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
-                Ok(DataConnectionStatus {
-                    state: DataConnectionState::Ready,
-                    message: Some("Connection check successful".to_string()),
-                    updated_at: Some(now),
-                    phases: vec![],
-                })
-            });
-            service
-                .meta_store
-                .update_data_connection_status(&connection_id, update_fn)
-                .await?;
-        },
-        Err(_) => {
-            let update_fn = Arc::new(|_: DataConnectionStatus| {
-                let now = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
-                Ok(DataConnectionStatus {
-                    state: DataConnectionState::NotReady,
-                    message: Some("Connection check failed".to_string()),
-                    updated_at: Some(now),
-                    phases: vec![],
-                })
-            });
-            service
-                .meta_store
-                .update_data_connection_status(&connection_id, update_fn)
-                .await?;
-
-            return Err(ValidationError::ConnectionCheckFailed(connection_id).into());
-        },
-    };
+    audit_data_connection(
+        tenant_id.as_str(),
+        connection_id.as_str(),
+        service.meta_store.clone(),
+        service.secret_store.clone(),
+        &service.flight_client,
+    )
+    .await?;
 
     info!("Connection checked successfully");
     Ok(HttpResponse::NoContent().finish())
@@ -318,6 +310,7 @@ mod tests {
     use commons::api::connection_types::DataConnectionTypeResource;
     use commons::api::connection_types::Secret;
     use commons::api::connections::DataConnectionResource;
+    use commons::api::connections::DataConnectionStatus;
     use commons::api::errors::SecretStoreError;
     use commons::api::storage::MetaStore;
     use commons::api::storage::SecretStore;
@@ -449,6 +442,7 @@ mod tests {
 
         async fn update_data_connection_status(
             &self,
+            _tenant_id: &str,
             _uid: &str,
             _update_fn: Arc<
                 dyn Fn(DataConnectionStatus) -> Result<DataConnectionStatus, commons::api::errors::MetaStoreError>
@@ -557,8 +551,8 @@ mod tests {
 
         async fn update_data_connection_type_status(
             &self,
-            _uid: &str,
-            _update_fn: Arc<
+            uid: &str,
+            update_fn: Arc<
                 dyn Fn(
                         commons::api::connection_types::DataConnectionTypeStatus,
                     ) -> Result<
@@ -569,7 +563,13 @@ mod tests {
             >,
         ) -> Result<commons::api::connection_types::DataConnectionTypeResource, commons::api::errors::MetaStoreError>
         {
-            unimplemented!()
+            let dct = self.get_data_connection_type("test-tenant", uid).await?;
+            let status = update_fn(dct.status)?;
+            Ok(DataConnectionTypeResource {
+                metadata: dct.metadata,
+                resource: dct.resource,
+                status,
+            })
         }
 
         async fn delete_data_connection_type(
