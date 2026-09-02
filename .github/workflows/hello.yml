@@ -9,9 +9,29 @@ on:
 permissions:
   contents: read
 
+env:
+  KIND_CLUSTER_NAME: dch-e2e
+
 jobs:
   hello:
     runs-on: ubuntu-latest
     steps:
       - name: Say hello
         run: echo "Hello from the CI pipeline!"
+
+      - name: Install kind
+        run: |
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
+          kind version
+
+      - name: Create kind cluster
+        run: |
+          kind create cluster --name "${KIND_CLUSTER_NAME}" --wait 120s
+          kubectl cluster-info --context "kind-${KIND_CLUSTER_NAME}"
+          kubectl get nodes
+
+      - name: Delete kind cluster
+        if: always()
+        run: kind delete cluster --name "${KIND_CLUSTER_NAME}"
