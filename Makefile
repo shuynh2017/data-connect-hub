@@ -8,6 +8,7 @@ $(error VERSION could not be determined; set VERSION explicitly)
 endif
 IMAGE            ?= data-connection-hub
 CONTAINER_ENGINE ?= $(shell command -v podman 2>/dev/null || command -v docker 2>/dev/null)
+KIND_CLUSTER     ?= dch-e2e
 V                ?=
 
 ifneq ($(V),)
@@ -23,6 +24,7 @@ endif
 	oc-setup-flight oc-setup-rest oc-setup-all \
 	oc-build-flight oc-build-rest oc-build-all \
 	sdk-install sdk-test sdk-lint sdk-fmt sdk-typecheck sdk-build sdk-all \
+	e2e kind-delete \
 	setup-hooks help
 
 # -------------------------------------------------------------------
@@ -118,6 +120,19 @@ test-unit:
 
 test-integration:
 	cargo test -p flight-service $(_NOCAPTURE)
+
+# -------------------------------------------------------------------
+# e2e-kind: 
+# - Pre-requisites are kind, kubectl, helm.
+# - Not going through a gateway at this time.
+# -------------------------------------------------------------------
+e2e-kind:
+	KIND_CLUSTER="$(KIND_CLUSTER)" ./e2e-tests/kind-infra.sh # kind specifics setup
+	./e2e-tests/dch-infra.sh  # all dch related setup (operator, service, tenants, etc.). Common for all types of cluster.
+	./e2e-tests/run-tests.sh  # passing '-v -s' to pytest will show more details
+
+kind-delete:
+	kind delete cluster --name "$(KIND_CLUSTER)"
 
 # -------------------------------------------------------------------
 # Quality
