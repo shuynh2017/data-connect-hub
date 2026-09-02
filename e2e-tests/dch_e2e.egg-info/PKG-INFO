@@ -1,0 +1,12 @@
+Metadata-Version: 2.4
+Name: dch-e2e
+Version: 0.1.0
+Summary: End-to-end tests for Data Connect Hub
+Requires-Python: >=3.11
+Requires-Dist: data-connect-hub[flight]
+Requires-Dist: pytest>=8.0
+Requires-Dist: httpx<1,>=0.27
+Requires-Dist: grpcio>=1.66
+Requires-Dist: grpcio-health-checking>=1.66
+Provides-Extra: dev
+Requires-Dist: ruff>=0.5; extra == "dev"

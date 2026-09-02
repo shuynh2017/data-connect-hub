@@ -1,0 +1,8 @@
+data-connect-hub[flight]
+pytest>=8.0
+httpx<1,>=0.27
+grpcio>=1.66
+grpcio-health-checking>=1.66
+
+[dev]
+ruff>=0.5
