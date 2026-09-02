@@ -80,6 +80,33 @@ impl PgMetaStore {
     }
 }
 
+// deserialize_connection_type deserializes a single stored connection type JSON blob,
+// returning the parsed resource or None if it is malformed. A blob that fails to
+// deserialize is logged and skipped so a single malformed row does not abort the
+// whole listing.
+fn deserialize_connection_type(value: serde_json::Value, global_tenant_id: &str) -> Option<DataConnectionTypeResource> {
+    match serde_json::from_value::<DataConnectionTypeResource>(value.clone()) {
+        Ok(mut dct) => {
+            if let Some(tenant) = dct.metadata.tenant_id.clone()
+                && tenant == global_tenant_id
+            {
+                // Discard the tenant field for global connection types
+                dct.metadata.tenant_id = None;
+            }
+            Some(dct)
+        },
+        Err(e) => {
+            let id = value
+                .get("metadata")
+                .and_then(|m| m.get("id"))
+                .and_then(|id| id.as_str())
+                .unwrap_or("unknown");
+            error!("failed to deserialize connection type {id}: {e}");
+            None
+        },
+    }
+}
+
 #[async_trait::async_trait]
 impl MetaStore for PgMetaStore {
     async fn get_data_connections(
@@ -417,26 +444,17 @@ impl MetaStore for PgMetaStore {
 
         let items: Vec<DataConnectionTypeResource> = rows
             .iter()
-            .map(|row| {
-                let json_value: serde_json::Value = row.try_get("data").map_err(|e| {
-                    error!("failed to read connection type column: {e}");
-                    MetaStoreError::Query("failed to read connection type".to_string())
-                })?;
-                let mut dct: DataConnectionTypeResource = serde_json::from_value(json_value).map_err(|e| {
-                    error!("failed to deserialize connection type: {e}");
-                    MetaStoreError::Deserialization(
-                        "failed to deserialize connection type; see service logs for details".to_string(),
-                    )
-                })?;
-                if let Some(tenant) = dct.metadata.tenant_id.clone()
-                    && tenant == self.global_tenant_id
-                {
-                    // Discard the tenant field for global connection types
-                    dct.metadata.tenant_id = None;
-                }
-                Ok(dct)
+            .filter_map(|row| {
+                let value: serde_json::Value = match row.try_get("data") {
+                    Ok(value) => value,
+                    Err(e) => {
+                        error!("failed to read connection type column: {e}");
+                        return None;
+                    },
+                };
+                deserialize_connection_type(value, &self.global_tenant_id)
             })
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect();
 
         Ok(ResourceList {
             total_count: items.len(),
@@ -707,5 +725,60 @@ mod tests {
         let debug = format!("{:?}", config);
         assert!(debug.contains("DatabaseConfig"));
         assert!(debug.contains("postgresql://localhost/db"));
+    }
+
+    fn valid_connection_type_json(id: &str, tenant_id: Option<&str>) -> serde_json::Value {
+        let mut metadata = serde_json::json!({
+            "id": id,
+            "created_at": "2024-01-01T00:00:00Z",
+            "updated_at": "2024-01-01T00:00:00Z",
+        });
+        if let Some(tenant) = tenant_id {
+            metadata["tenant_id"] = serde_json::json!(tenant);
+        }
+        serde_json::json!({
+            "metadata": metadata,
+            "resource": {
+                "name": "pg",
+                "provider": "postgres",
+                "credentials_fields": [],
+            },
+        })
+    }
+
+    #[test]
+    fn test_deserialize_connection_type_valid() {
+        let a = deserialize_connection_type(valid_connection_type_json("a", None), "global");
+        let b = deserialize_connection_type(valid_connection_type_json("b", None), "global");
+        assert!(a.is_some());
+        assert!(b.is_some());
+    }
+
+    #[test]
+    fn test_deserialize_connection_type_skips_invalid() {
+        // Blob is missing the required `resource.name` field.
+        let invalid = serde_json::json!({
+            "metadata": {
+                "id": "bad-1",
+                "created_at": "2024-01-01T00:00:00Z",
+                "updated_at": "2024-01-01T00:00:00Z",
+            },
+            "resource": {
+                "provider": "postgres",
+                "credentials_fields": [],
+            },
+        });
+        assert!(deserialize_connection_type(invalid, "global").is_none());
+
+        let good = deserialize_connection_type(valid_connection_type_json("good-1", None), "global");
+        assert_eq!(good.unwrap().metadata.id, "good-1");
+    }
+
+    #[test]
+    fn test_deserialize_connection_type_scrubs_global_tenant() {
+        let global = deserialize_connection_type(valid_connection_type_json("g", Some("global")), "global");
+        let tenant = deserialize_connection_type(valid_connection_type_json("t", Some("tenant-a")), "global");
+        assert_eq!(global.unwrap().metadata.tenant_id, None);
+        assert_eq!(tenant.unwrap().metadata.tenant_id, Some("tenant-a".to_string()));
     }
 }
