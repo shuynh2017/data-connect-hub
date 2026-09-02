@@ -26,11 +26,10 @@ jobs:
           sudo mv ./kind /usr/local/bin/kind
           kind version
 
-      - name: Create kind cluster
-        run: |
-          kind create cluster --name "${KIND_CLUSTER_NAME}" --wait 120s
-          kubectl cluster-info --context "kind-${KIND_CLUSTER_NAME}"
-          kubectl get nodes
+      - name: Run e2e tests
+        run: make e2e-kind
+        env:
+          KIND_CLUSTER: ${{ env.KIND_CLUSTER_NAME }}
 
       - name: Delete kind cluster
         if: always()
