@@ -1,0 +1,167 @@
+#!/bin/bash
+set -euo pipefail
+
+INFRA_NAMESPACE="${1:-dch-infra-example}"
+TENANT_ID="${2:-dch-example}"
+CONN_ID="${3}"
+
+# Bucket-relative object key. The S3 connector builds an opendal Operator with
+# the bucket baked in from the connection credentials, so the query is a key
+# relative to the bucket root (NOT a full s3://bucket/... URL). The extension
+# drives format detection (.csv / .parquet / .jsonl).
+OBJECT_KEY="${OBJECT_KEY:-datasets/dch-test-prompts.csv}"
+
+LOCAL_PORT=15051
+SA_NAME="${SA_NAME:-dch-test-user}"
+pf_pid=""
+
+cleanup() {
+  if [ -n "$pf_pid" ]; then
+    kill $pf_pid 2>/dev/null || true
+    wait $pf_pid 2>/dev/null || true
+  fi
+}
+
+check_result() {
+  local success="$1"
+  if [ "$success" = "true" ]; then
+    echo "  PASSED"
+  else
+    echo "  FAILED"
+    echo ""
+    echo "--- Cleanup ---"
+    cleanup
+    echo "  Port-forward stopped"
+    exit 1
+  fi
+  echo ""
+}
+
+echo "  Finding flight-service pod..."
+flight_pod=$(oc get po -n "$INFRA_NAMESPACE" -l app.kubernetes.io/name=flight-service -o jsonpath='{.items[0].metadata.name}' 2>/dev/null) || true
+if [ -z "$flight_pod" ]; then
+  echo "  FAILED: no flight-service pod found in namespace '$INFRA_NAMESPACE'"
+  exit 1
+fi
+echo "  Pod: $flight_pod"
+
+echo "  Port-forwarding $flight_pod:50051 -> localhost:$LOCAL_PORT..."
+lsof -ti :$LOCAL_PORT 2>/dev/null | xargs kill 2>/dev/null || true
+oc port-forward "pod/$flight_pod" -n "$INFRA_NAMESPACE" "$LOCAL_PORT:50051" &>/dev/null &
+pf_pid=$!
+sleep 2
+
+if ! kill -0 $pf_pid 2>/dev/null; then
+  echo "  FAILED: port-forward died"
+  exit 1
+fi
+echo "  Port-forward ready (pid=$pf_pid)"
+echo ""
+
+source ./get-token.sh "$TENANT_ID"
+
+if [ -z "$user_token" ]; then
+  echo "  FAILED: could not obtain token for $SA_NAME (run create-test-user.sh first)"
+  cleanup
+  exit 1
+fi
+echo "  Token obtained for $SA_NAME"
+echo ""
+
+if ! python3 -c "import pyarrow.flight" 2>/dev/null; then
+  echo "  FAILED: pyarrow is required (pip install pyarrow)"
+  cleanup
+  exit 1
+fi
+
+echo "  Query: $OBJECT_KEY"
+echo "  GetFlightInfo + DoGet via pyarrow.flight (CommandStatementQuery)"
+
+# The flight service is a Flight SQL server. pyarrow.flight speaks generic
+# Flight, so we hand it a CMD descriptor wrapping a CommandStatementQuery whose
+# query is the object key, then stream the result with do_get.
+DCH_FLIGHT_HOST="localhost:$LOCAL_PORT" \
+DCH_FLIGHT_TOKEN="$user_token" \
+DCH_TENANT_ID="$TENANT_ID" \
+DCH_CONN_ID="$CONN_ID" \
+DCH_QUERY="$OBJECT_KEY" \
+python3 -c "
+import os, sys
+import pyarrow.flight as flight
+
+
+def encode_field(fn, data):
+    tag = bytes([(fn << 3) | 2])
+    length = len(data)
+    varint = bytearray()
+    while length > 0x7f:
+        varint.append((length & 0x7f) | 0x80)
+        length >>= 7
+    varint.append(length)
+    return tag + bytes(varint) + data
+
+
+def command_statement_query(query):
+    inner = encode_field(1, query.encode())
+    type_url = b'type.googleapis.com/arrow.flight.protocol.sql.CommandStatementQuery'
+    return encode_field(1, type_url) + encode_field(2, inner)
+
+
+def print_table(table):
+    print(f'  Rows: {table.num_rows}')
+    names = table.column_names
+    widths = {}
+    for c in names:
+        vals = [str(v) for v in table.column(c).to_pylist()]
+        widths[c] = min(max(len(c), max((len(v) for v in vals), default=0)), 50)
+    print('  ' + ' | '.join(f'{c:<{widths[c]}}' for c in names))
+    print('  ' + '-+-'.join('-' * widths[c] for c in names))
+    for i in range(min(table.num_rows, 50)):
+        row = []
+        for c in names:
+            v = str(table.column(c)[i].as_py())
+            if len(v) > 50:
+                v = v[:47] + '...'
+            row.append(f'{v:<{widths[c]}}')
+        print('  ' + ' | '.join(row))
+    if table.num_rows > 50:
+        print(f'  ... ({table.num_rows - 50} more rows)')
+
+
+host = os.environ['DCH_FLIGHT_HOST']
+query = os.environ['DCH_QUERY']
+options = flight.FlightCallOptions(headers=[
+    (b'authorization', ('Bearer ' + os.environ['DCH_FLIGHT_TOKEN']).encode()),
+    (b'x-tenant-id', os.environ['DCH_TENANT_ID'].encode()),
+    (b'x-data-connection-id', os.environ['DCH_CONN_ID'].encode()),
+])
+
+try:
+    client = flight.FlightClient('grpc://' + host)
+    descriptor = flight.FlightDescriptor.for_command(command_statement_query(query))
+    info = client.get_flight_info(descriptor, options)
+    if not info.endpoints:
+        print('  No endpoints returned', file=sys.stderr)
+        sys.exit(1)
+    print('  Schema: ' + ', '.join(f.name for f in info.schema))
+
+    for endpoint in info.endpoints:
+        reader = client.do_get(endpoint.ticket, options)
+        print_table(reader.read_all())
+except Exception as e:
+    print(f'  ERROR: {e}', file=sys.stderr)
+    sys.exit(1)
+"
+rc=$?
+
+if [ "$rc" -eq 0 ]; then
+  check_result "true"
+else
+  check_result "false"
+fi
+
+echo ""
+echo "--- Cleanup ---"
+cleanup
+echo "  Port-forward stopped"
+exit 0
