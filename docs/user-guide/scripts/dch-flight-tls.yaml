@@ -1,0 +1,11 @@
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+    name: dch-flight-tls
+    namespace: dch-infra-example
+spec:
+    host: dch-flight-service.dch-infra-example.svc.cluster.local
+    trafficPolicy:
+      tls:
+        mode: SIMPLE
+        insecureSkipVerify: true
