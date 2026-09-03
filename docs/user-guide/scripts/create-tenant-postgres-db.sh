@@ -1,18 +1,18 @@
 #!/bin/bash
 
-NS="${1:-dch-infra-example}"
+. ./common-vars.sh
 
-oc apply -n "$NS" -f - <<'EOF'
+oc apply -n "$TENANT_NAMESPACE" -f - <<EOF
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: dch-postgres
+  name: ${TENANT_DB_INSTANCE}
 spec:
   instances: 1
   storage:
     size: 5Gi
   bootstrap:
     initdb:
-      database: dataconnecthub
-      owner: dch
+      database: ${TENANT_DB}
+      owner: tenant_a
 EOF

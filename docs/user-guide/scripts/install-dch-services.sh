@@ -1,7 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
-INFRA_NAMESPACE="${1:-dch-infra-example}"
+. ./common-vars.sh
+
+export tokenReviewAudiences=`oc get authentication cluster -o jsonpath='{.spec.serviceAccountIssuer}'`
+echo "tokenReviewAudiences=$tokenReviewAudiences"
 
 oc apply -f - <<EOF
 apiVersion: dataconnecthub.opendatahub.io/v1alpha1
@@ -17,5 +20,5 @@ spec:
     namespace: openshift-ingress
   tokenReviewAudiences:
     - "https://kubernetes.default.svc"
-    - "https://rh-oidc.s3.us-east-1.amazonaws.com/27bd6cg0vs7nn08mue83fbof94dj4m9a"
+    - "$tokenReviewAudiences"
 EOF

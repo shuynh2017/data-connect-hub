@@ -1,9 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
-TENANT_NAMESPACE="${1:-dch-example}"
+. ./common-vars.sh
+
 ROLE="${2:-dch-read-write}"
-SA_NAME="${3:-dch-test-user}"
 
 echo "  Binding '$SA_NAME' to role '$ROLE' in namespace '$TENANT_NAMESPACE'..."
 oc apply -f - <<EOF

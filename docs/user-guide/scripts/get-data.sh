@@ -3,7 +3,13 @@ set -euo pipefail
 
 . ./common-vars.sh
 
-CONN_ID="${1}"
+CONN_ID="${1:-${CONN_ID:-}}"
+if [ -z "$CONN_ID" ]; then
+  echo "Usage: $0 <connection-id>   (or set CONN_ID)" >&2
+  exit 1
+fi
+FLIGHT_HOST="${FLIGHT_HOST:-$GW_HOST}"
+FLIGHT_PORT="${FLIGHT_PORT:-$GW_PORT}"
 
 pretty_print_json() {
   python3 -c "
@@ -151,19 +157,18 @@ print(base64.b64encode(any_bytes).decode())
 " "$SQL_QUERY")
 
 echo "  SQL: $SQL_QUERY"
-echo "  CMD: grpcurl -insecure -H 'Authorization: Bearer <token>' -H 'x-tenant-id: $TENANT_ID' -H 'x-data-connection-id: $CONN_ID' -d '{\"type\":\"CMD\",\"cmd\":\"<base64>\"}' $GW_HOST:443 arrow.flight.protocol.FlightService/GetFlightInfo"
-get_info_output=$(grpcurl -v -insecure  \
+echo "  CMD: grpcurl -insecure -H 'Authorization: Bearer <token>' -H 'x-tenant-id: $TENANT_ID' -H 'x-data-connection-id: $CONN_ID' -d '{\"type\":\"CMD\",\"cmd\":\"<base64>\"}' $FLIGHT_HOST:$FLIGHT_PORT arrow.flight.protocol.FlightService/GetFlightInfo"
+get_info_output=$(grpcurl -insecure  \
   -import-path "$PROTO_DIR" -proto Flight.proto \
   -H "Authorization: Bearer $user_token" \
   -H "x-tenant-id: $TENANT_ID" \
   -H "x-data-connection-id: $CONN_ID" \
   -d "{\"type\":\"CMD\",\"cmd\":\"$CMD_STMT\"}" \
-  "localhost:8443" arrow.flight.protocol.FlightService/GetFlightInfo 2>&1) || true
+  "$FLIGHT_HOST:$FLIGHT_PORT" arrow.flight.protocol.FlightService/GetFlightInfo 2>&1) || true
 pretty_print_json "$get_info_output"
 
 # Extract ticket 
 sql_ticket=$(echo "$get_info_output" | python3 -c "import sys,json; print(json.load(sys.stdin)['endpoint'][0]['ticket']['ticket'])" 2>/dev/null) || true
-sql_ticket=CkJ0eXBlLmdvb2dsZWFwaXMuY29tL2Fycm93LmZsaWdodC5wcm90b2NvbC5zcWwuVGlja2V0U3RhdGVtZW50UXVlcnkSHAoaU0VMRUNUICogRlJPTSB0ZXN0X3Byb21wdHM=
 echo sql_ticket=$sql_ticket
 
 echo "DoGet for SQL query (expect test_prompts data)"
@@ -172,18 +177,13 @@ if [ -z "$sql_ticket" ]; then
   echo "  SKIPPED  could not extract ticket"
   echo ""
 else
-  echo "  CMD: grpcurl -insecure -H 'Authorization: Bearer <token>' -H 'x-tenant-id: $TENANT_ID' -H 'x-data-connection-id: $CONN_ID' -d '{\"ticket\":\"<ticket>\"}' $GW_HOST:443 arrow.flight.protocol.FlightService/DoGet"
+  echo "  CMD: grpcurl -insecure -H 'Authorization: Bearer <token>' -H 'x-tenant-id: $TENANT_ID' -H 'x-data-connection-id: $CONN_ID' -d '{\"ticket\":\"<ticket>\"}' $FLIGHT_HOST:$FLIGHT_PORT arrow.flight.protocol.FlightService/DoGet"
   do_get_output=$(grpcurl -insecure \
     -import-path "$PROTO_DIR" -proto Flight.proto \
     -H "Authorization: Bearer $user_token" \
     -H "x-tenant-id: $TENANT_ID" \
     -H "x-data-connection-id: $CONN_ID" \
     -d "{\"ticket\":\"$sql_ticket\"}" \
-    "$GW_HOST:443" arrow.flight.protocol.FlightService/DoGet 2>&1) || true
+    "$FLIGHT_HOST:$FLIGHT_PORT" arrow.flight.protocol.FlightService/DoGet 2>&1) || true
   decode_arrow_data "$do_get_output"
 fi
-
-echo ""
-echo "--- Cleanup ---"
-cleanup
-

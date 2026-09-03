@@ -1,8 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-TENANT_NAMESPACE="dch-example"
-SA_NAME="${SA_NAME:-dch-test-user}"
+. ./common-vars.sh
 
 SA_ISSUER=$(oc get authentication cluster -o jsonpath='{.spec.serviceAccountIssuer}' 2>/dev/null) || true
 if [ -z "$SA_ISSUER" ]; then
@@ -24,5 +23,5 @@ user_token=$(curl -s -X POST "http://127.0.0.1:${PROXY_PORT}/api/v1/namespaces/$
 kill $proxy_pid 2>/dev/null || true
 wait $proxy_pid 2>/dev/null || true
 proxy_pid=""
-#echo user_token=$user_token
+echo user_token=$user_token
 export user_token=$user_token

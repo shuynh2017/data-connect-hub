@@ -3,7 +3,6 @@ set -euo pipefail
 
 . ./common-vars.sh
 
-POD_NAME="dch-test-runner"
 API_PATH="/api/v1alpha1/data/connections"
 
 . ./get-token.sh
