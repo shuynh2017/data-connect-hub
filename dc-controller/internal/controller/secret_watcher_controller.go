@@ -59,6 +59,13 @@ func (r *SecretWatcherReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 		return ctrl.Result{}, err
 	}
+	deleting, err := dataConnectServiceDeleting(ctx, r.Client)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if deleting {
+		return ctrl.Result{}, nil
+	}
 
 	if secret.Annotations[annotationDCHSynced] == valueSyncedTrue {
 		return ctrl.Result{}, nil
@@ -95,7 +102,7 @@ func (r *SecretWatcherReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		Name:                 displayName,
 		DataConnectionTypeID: typeID,
 		Format:               "tabular",
-		Admin:                &ConnectionAdmin{SecretRef: secret.Name},
+		CredentialsRef:       &CredentialsRef{Secret: secret.Name},
 		Properties:           map[string]string{},
 	}
 
