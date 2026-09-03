@@ -1,6 +1,7 @@
 #!/bin/bash
 #set -euo pipefail
 #
+. ./common-vars.sh
 GATEWAY_NAME="${GATEWAY_NAME:-dch-gateway}"
 GATEWAY_NS="${GATEWAY_NS:-openshift-ingress}"
 
@@ -381,20 +382,6 @@ run_cmd() {
 
 usage() {
   echo -e "\nUsage: "
-  echo -e "  -c all"
-  echo -e "  -c verify_gateway"
-  echo -e "  -c populate_db_temp"
-
-  echo -e "  -c verify_dch_operator"
-  echo -e "  -c install_data_connect_service"
-  echo -e "  -c verify_data_connect_service"
-
-  echo -e "  -c verify_clusterroles_bindings"
-  echo -e "  -c verify_flight_sec"
-  echo -e "  -c verify_rest_sec"
-  echo -e "  -c verify_rest_api"
-  echo -e "  -c verify_flight_api"
-  echo -e "  -c verify_s3"
 }
 
 
@@ -412,29 +399,7 @@ do
     esac
 done
 
-if [ "${command_opt}" == 'verify_gateway' ]; then
-  verify_gateway
-elif [ "${command_opt}" == 'verify_dch_operator' ]; then
-  verify_dch_operator
-elif [ "${command_opt}" == 'install_data_connect_service' ]; then
-  install_data_connect_service
-elif [ "${command_opt}" == 'verify_data_connect_service' ]; then
-  verify_data_connect_service
-elif [ "${command_opt}" == 'verify_clusterroles_bindings' ]; then
-  verify_clusterroles_bindings
-elif [ "${command_opt}" == 'verify_rest_api' ]; then
-  verify_rest_api
-elif [ "${command_opt}" == 'verify_flight_api' ]; then
-  verify_flight_api
-elif [ "${command_opt}" == 'verify_rest_sec' ]; then
-  verify_rest_sec
-elif [ "${command_opt}" == 'verify_flight_sec' ]; then
-  verify_flight_sec
-elif [ "${command_opt}" == 'populate_db_temp' ]; then
-  populate_db_temp
-elif [ "${command_opt}" == 'verify_s3' ]; then
-  verify_s3
-elif [ "${command_opt}" == 'all' ]; then
+if [ "${command_opt}" == 'all' ]; then
   # All sequence for demo video
   SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
   echo ""
@@ -453,14 +418,7 @@ elif [ "${command_opt}" == 'all' ]; then
   run_cmd "kubectl get deployment rhods-operator -n redhat-ods-operator -o jsonpath='{.spec.template.spec.containers[*].image}'"
 
   echo ""
-  verify_dsci
-
-  # Create own gateway method
-  ./create-gateway.sh
-  if [[ $? -ne 0 ]]; then
-    exit 1
-  fi
-  run_cmd "oc get gateway -n openshift-ingress dch-gateway"
+  run_cmd "oc get dsci -A"
 
   # Use existing data-science-gateway method
   run_cmd "oc get gateway -n openshift-ingress data-science-gateway"
@@ -472,7 +430,7 @@ elif [ "${command_opt}" == 'all' ]; then
     exit 1
   fi
   echo ""
-  run_cmd "oc get ns dch-example dch-infra-example"
+  run_cmd "oc get ns dch-services dch-tenant-a"
 
   echo ""
   echo "================================== Pre-req: INSTALL POSTGRES OPERATOR ============================="
@@ -484,15 +442,15 @@ elif [ "${command_opt}" == 'all' ]; then
 
   echo ""
   echo "================================== Pre-req: Create POSTGRES DB for DCH meta data ======"
-  ./create-postgres-db.sh
+  ./create-service-postgres-db.sh
   if [[ $? -ne 0 ]]; then
     exit 1
   fi
-  run_cmd "oc get po -n dch-infra-example dch-postgres-1"
+  run_cmd "oc get po -n dch-services dch-postgres-1"
 
   echo ""
   echo "================================== Pre-req: Create Postgres secret  ======"
-  ./create-postgres-secret.sh
+  ./create-service-postgres-secret.sh
   if [[ $? -ne 0 ]]; then
     exit 1
   fi
@@ -509,13 +467,16 @@ elif [ "${command_opt}" == 'all' ]; then
     exit 1
   fi
 
-  run_cmd "oc describe DataConnectService -n dch-infra-example"
-  run_cmd "oc get po -n dch-infra-example"
-  run_cmd "oc describe httproute -n dch-infra-example"
+  run_cmd "oc describe DataConnectService -n dch-services"
+  run_cmd "oc get po -n dch-services"
+  run_cmd "oc describe httproute -n dch-services"
+
+  ./config-gateway.sh
+  oc get httproutes -n dch-services dch-data-connect-hub -o yaml
 
   # ROSA: Patching the gateway starts
   # grpcurl (h2) → OpenShift Route/HAProxy (:443) → Envoy gateway pod → flight-service (:8443 TLS h2
-  NS=dch-infra-example
+  NS=dch-services
   HOST=$(oc get route data-science-gateway -n openshift-ingress -o jsonpath='{.spec.host}')
 
   # Does the Envoy gateway work? (bypass HAProxy)
@@ -539,34 +500,42 @@ elif [ "${command_opt}" == 'all' ]; then
   # tep 6 — Fix the router HTTP/2 downgrade (managed ROSA)
 
   # cluster-wide is blocked by the managed webhook; do it at the IngressController instead:
-  oc annotate ingresscontroller default -n openshift-ingress-operator \
-    ingress.operator.openshift.io/default-enable-http2=true --overwrite
-  oc rollout status deployment/router-default -n openshift-ingress
+  #oc annotate ingresscontroller default -n openshift-ingress-operator \
+  #  ingress.operator.openshift.io/default-enable-http2=true --overwrite
+  #oc rollout status deployment/router-default -n openshift-ingress
 
-  
-
-  run_cmd "oc annotate gateway data-science-gateway -n openshift-ingress \
-  opendatahub.io/managed=false --overwrite"
-
-  oc patch gateway data-science-gateway -n openshift-ingress --type=json -p '[{"op":"replace", "path":"/spec/listeners/0/allowedRoutes/namespaces/selector/matchExpressions/0/values", "value":["openshift-ingress","redhat-ods-applications","'"dch-infra-example"'"]}]'
-
-  oc get gateway data-science-gateway -n openshift-ingress -o jsonpath='{.spec.listeners[0].allowedRoutes.namespaces.selector.matchExpressions[0].values[*]}'
-
-  oc get httproute dch-data-connect-hub -n dch-infra-example   -o jsonpath='{range .status.parents[*].conditions[*]}{.type}: {.status}{"\n"}{end}'
+  #run_cmd "oc annotate gateway data-science-gateway -n openshift-ingress \
+  #opendatahub.io/managed=false --overwrite"
 
   # ROSA: Patching the gateway ends ...
   #
-  #
-  #./grant-service-read-secret.sh # skip fow now ...
-  #verify_clusterroles_bindings
-  #
+  ./create-tenant-postgres-db.sh
+  run_cmd "oc get cluster dch-tenant-postgres -n dch-tenant-a -o jsonpath='{.status.phase}'"
+
+  echo ""
+  echo "==================================== DCH ADMIN USER: Populate test data  ======"
+  ./populate_test_data.sh
+  if [[ $? -ne 0 ]]; then
+    exit 1
+  fi
+
+  ./create-tenant-postgres-secret.sh
+  run_cmd "oc get secret -n dch-tenant-a tenant-database-secret"
+
+  echo ""
+  echo "==================================== DCH ADMIN USER: Grant DCH services in tenant infra namespace to read connection secrets in tenant namespace  ======"
+  ./grant-service-read-secret.sh
+  if [[ $? -ne 0 ]]; then
+    exit 1
+  fi
+
   echo ""
   echo "================================== CLUSTER ADMIN: CREATE TEST USER in TENANT NAMESPACE dch-example ============================="
   ./create-test-user.sh
   if [[ $? -ne 0 ]]; then
     exit 1
   fi
-  run_cmd "oc get serviceaccount -n dch-example dch-test-user"
+  run_cmd "oc get sa -n dch-tenant-a dch-test-user"
 
   echo ""
   echo "================================== TENANT ADMIN: authorize test user to DCH services  ===="
@@ -574,18 +543,12 @@ elif [ "${command_opt}" == 'all' ]; then
   if [[ $? -ne 0 ]]; then
     exit 1
   fi
-  run_cmd "oc get rolebindings -n dch-example dch-test-user-dch-read-write"
+  run_cmd "oc get rolebindings -n dch-tenant-a dch-test-user-dch-read-write"
+
 
   echo ""
   echo "==================================== DCH USER: Get token, required for authentication  ===="
   ./get-token.sh
-  if [[ $? -ne 0 ]]; then
-    exit 1
-  fi
-
-  echo ""
-  echo "==================================== DCH ADMIN USER: Create connection secrets in tenant namespace  ==============="
-  ./create-db-secret.sh
   if [[ $? -ne 0 ]]; then
     exit 1
   fi
@@ -595,13 +558,6 @@ elif [ "${command_opt}" == 'all' ]; then
   #  exit 1
   #fi
   #run_cmd "oc get secret s3-test-creds -n dch-example"
-
-  echo ""
-  echo "==================================== DCH ADMIN USER: Grant DCH services in tenant infra namespace to read connection secrets in tenant namespace  ======"
-  ./grant-service-read-secret.sh
-  if [[ $? -ne 0 ]]; then
-    exit 1
-  fi
 
   echo ""
   echo "==================================== DCH ADMIN USER: Create connection types ==========================="
@@ -630,13 +586,6 @@ elif [ "${command_opt}" == 'all' ]; then
   echo "==================================== DCH ADMIN USER: Create connection for a connection type  ========="
   #./create-connection.sh 0edb0de7-8fce-47dc-a8ca-7c6e90ec81e4
   ./create-s3-connection.sh 46f48ffd-2721-4df3-a8f5-3343b8114b03
-  if [[ $? -ne 0 ]]; then
-    exit 1
-  fi
-
-  echo ""
-  echo "==================================== DCH ADMIN USER: Populate test data  ======"
-  ./populate_test_data.sh
   if [[ $? -ne 0 ]]; then
     exit 1
   fi

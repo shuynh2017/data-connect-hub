@@ -1,7 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
-NS="${1:-dch-infra-example}"
+. ./common-vars.sh
+
+NS=$INFRA_NAMESPACE
 
 echo "  Extracting database URI from secret 'dch-postgres-app' in namespace '$NS'..."
 URI=$(oc get secret dch-postgres-app -n "$NS" -o jsonpath='{.data.uri}' 2>/dev/null | base64 -d) || true

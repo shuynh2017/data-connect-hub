@@ -12,8 +12,7 @@ rules:
     resources: ["secrets"]
     verbs: ["get"]
     resourceNames:
-      - dch-database-config
-      - $DCH_S3_SECRET_NAME
+      - tenant-database-secret
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

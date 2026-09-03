@@ -3,7 +3,6 @@ set -euo pipefail
 
 . ./common-vars.sh
 
-POD_NAME="dch-test-runner"
 API_PATH="/api/v1alpha1/data/connection-types"
 
 . ./get-token.sh
@@ -20,5 +19,6 @@ CT_DATA='{
 "description":"test connection type"
  }'
 
+echo Gateway URL=$GW_URL
 
-curl -kX POST -H "Content-Type: application/json" -H "Authorization: Bearer $user_token" -H "x-tenant-id: $TENANT_NAMESPACE" -d "$CT_DATA"  "${GW_URL}${API_PATH}" 
+curl -k -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $user_token" -H "x-tenant-id: $TENANT_NAMESPACE" -d "$CT_DATA"  "${GW_URL}${API_PATH}" 

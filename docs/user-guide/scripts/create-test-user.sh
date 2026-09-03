@@ -1,8 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-TENANT_NAMESPACE="${1:-dch-example}"
-SA_NAME="${2:-dch-test-user}"
+. ./common-vars.sh
 
 create_sa() {
   local sa_name="$1"
