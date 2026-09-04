@@ -35,9 +35,11 @@ The purpose of this document is to provide **end-users** steps to install, confi
 - You have logged in as a user with cluster-admin privileges - the cluster admin.
 - You have installed {productname-long} {vernum}.
 - A `DataScienceClusterInitialization` (DSCI) exists in your cluster. The `DataScienceClusterInitialization` gets created by the Red Hat OpenShift-AI operator out of the box. Verify DSCI as follows:
+  ```console
+  oc get dsci -A
   ```
-  $ oc get dsci -A
-
+  You should see:
+  ```console
   NAME           AGE   PHASE   CREATED AT
   default-dsci   83d   Ready   2026-05-08T12:41:52Z
   ```
@@ -46,7 +48,7 @@ The purpose of this document is to provide **end-users** steps to install, confi
   - `openshift-ingress`: This is where the `data-science-gateway-class` `gateways` are.
   - DCH services run in separate namespace. For this demo, we will use `dch-services`. You can create a namespace as follows:
     ```
-    $ oc new-project dch-services
+    oc new-project dch-services
     ```
   - Tenant-namespaces: A tenant is a user of DCH service.
 
@@ -55,18 +57,27 @@ The purpose of this document is to provide **end-users** steps to install, confi
 - A Postgres database to store DCH meta data. You can prepare Postgres database as follows:
   - First, run the script [scripts/install-postgres-operator.sh](scripts/install-postgres-operator.sh) to install the Postgres operator. After few seconds, you can check the operator to make sure it's `Succeeded` as follows:
     ```console
-    $ oc get csv -n openshift-operators -l operators.coreos.com/cloudnative-pg.openshift-operators=
+    oc get csv -n openshift-operators -l operators.coreos.com/cloudnative-pg.openshift-operators=
+    ```
+    You should see:
+    ```console
     NAME                     DISPLAY         VERSION   REPLACES                 PHASE
     cloudnative-pg.v1.30.0   CloudNativePG   1.30.0    cloudnative-pg.v1.29.2   Succeeded
     ``` 
   - Next, run the script [scripts/create-service-postgres-db.sh](scripts/create-service-postgres-db.sh) to install the database in `dch-services` namespace. After few seconds, you can check the database as follows:
     ```console
-    $ oc get cluster dch-postgres -n dch-services -o jsonpath='{.status.phase}'
+    oc get cluster dch-postgres -n dch-services -o jsonpath='{.status.phase}'
+    ```
+    You should see:
+    ```console
     Cluster in healthy state
     ```
   - Next, run the script [scripts/create-service-postgres-secret.sh](scripts/create-service-postgres-secret.sh) to extract the database URI which is then used to create a secret for DCH to use to access this database instance. You can check the secret as follows:
     ```console
-    $ oc get secret -n dch-services dch-database-config
+    oc get secret -n dch-services dch-database-config
+    ```
+    You should see:
+    ```
     NAME                  TYPE     DATA   AGE
     dch-database-config   Opaque   3      25h
     ```
@@ -79,7 +90,10 @@ As a cluster admin, you can install DCH operator.
   - Change directory to `data-connect-hub`.
   - Run the commands in [scripts/install-operator.sh](scripts/install-operator.sh). This installs the operator in `redhat-ods-applications` namespace. You can check the DCH operator as follows:
     ```console
-    $ oc get po -n redhat-ods-applications -l app.kubernetes.io/name=dc-controller
+    oc get po -n redhat-ods-applications -l app.kubernetes.io/name=dc-controller
+    ```
+    You should see:
+    ```
     NAME                                                READY   STATUS    RESTARTS   AGE
     dc-controller-controller-manager-849cc9b557-5zjdx   1/1     Running   0          100s
     ```
@@ -96,15 +110,21 @@ dataconnectservice.dataconnecthub.opendatahub.io/default-dataconnectservice crea
 
 You can verify the `DataConnectService` as follows:
 - Verify all pods are up and running:
+  ```console
+  oc get po -n dch-services -l app.kubernetes.io/part-of=data-connect-hub
   ```
-  $ oc get po -n dch-services -l app.kubernetes.io/part-of=data-connect-hub
+  You should see:
+  ```console
   NAME                                  READY   STATUS    RESTARTS   AGE
   dch-flight-service-657bfc99b7-2qf89   1/1     Running   0          3m20s
   dch-rest-service-7474fbbff9-kqzxt     2/2     Running   0          3m20s
   ```
 - Verify HttpRoute has been created:
   ```console
-  $ oc get HttpRoutes -n dch-services
+  oc get HttpRoutes -n dch-services
+  ```
+  You should see:
+  ```
   NAME                   HOSTNAMES   AGE
   dch-data-connect-hub               120m
   ```
@@ -125,6 +145,9 @@ deployment "router-default" successfully rolled out
 - You can check the route status as follows:
   ```console
   oc get httproute dch-data-connect-hub -n dch-services -o jsonpath='{range .status.parents[*].conditions[*]}{.type}: {.status}{"\n"}{end}'
+  ```
+  You should see:
+  ```console
   Accepted: True
   ResolvedRefs: True
     ```
@@ -132,33 +155,37 @@ deployment "router-default" successfully rolled out
   ```console
   oc get gateway data-science-gateway -n openshift-ingress \
     -o jsonpath='{.metadata.annotations.opendatahub\.io/managed}{"\n"}'
-  # expect: false
   ```
+  You should expect `false`.
+
 - IngressController HTTP/2 enabled:
   ```console
   oc get ingresscontroller default -n openshift-ingress-operator \
     -o jsonpath='{.metadata.annotations.ingress\.operator\.openshift\.io/default-enable-http2}{"\n"}'
-  # expect: true
   ```
+  You should expect `true`.
 - Check gateway listener allowedRoutes namespaces:
   ```console
     oc get gateway data-science-gateway -n openshift-ingress \
       -o jsonpath='{.spec.listeners[0].allowedRoutes.namespaces.selector.matchExpressions[0].values}{"\n"}'
-    # expect: ["openshift-ingress","redhat-ods-applications","dch-services"]
   ```
+  You should expect `["openshift-ingress","redhat-ods-applications","dch-services"]`
 ### Setup Tenant
 The steps to setup a tenant for DCH is as follows:
 
 #### Create Tenant Namespace
 A tenant is a user of DCH service. For this demo, we will create a tenant a namespace as follows:
-```
-$ oc new-project dch-tenant-a
+```console
+oc new-project dch-tenant-a
 ```
 #### Prepare Tenant Data Source
 A tenant can have different types of data sources such as Postgres, S3, ElasticSearch, etc ... For this demo, we will use Postgres:
 - Run [scripts/create-tenant-postgres-db.sh](scripts/create-tenant-postgres-db.sh) to create a database in tenant namespace. You can check the database as follows:
   ```console
-  $ oc get cluster dch-tenant-postgres -n dch-tenant-a -o jsonpath='{.status.phase}'
+  oc get cluster dch-tenant-postgres -n dch-tenant-a -o jsonpath='{.status.phase}'
+  ```
+  You should see:
+  ```console
   Cluster in healthy state
   ```
 
@@ -177,7 +204,10 @@ GRANT
 
 - Run the script [scripts/create-tenant-postgres-secret.sh](scripts/create-tenant-postgres-secret.sh) to extract the database URI which is then used to create a secret for DCH to use to access this database instance. You can check the secret as follows:
     ```console
-    $ oc get secret -n dch-tenant-a tenant-database-secret
+    oc get secret -n dch-tenant-a tenant-database-secret
+    ```
+    You should see:
+    ```
     NAME                  TYPE     DATA   AGE
     tenant-database-secret   Opaque   3      25h
     ```
@@ -195,7 +225,10 @@ You can run the commands in [scripts/create-test-user.sh](scripts/create-test-us
 
 You can verify the users as follows:
 ```console
-$ oc get sa -n dch-tenant-a dch-test-user
+oc get sa -n dch-tenant-a dch-test-user
+```
+You should see:
+```
 NAME               SECRETS   AGE
 dch-test-user      1         3m7s
 ```
@@ -206,7 +239,10 @@ There are 2 cluster roles in DCH; namely, `dch-read` and `dch-read-write`. The `
 The cluster admin can authorize users to consume the tenant's DCH services.
 To allow `dch-test-user` to have read/write access, you can run the commands in [scripts/auth-test-user.sh](scripts/auth-test-user.sh). You can verify as follows:
 ```console
-$  oc get rolebindings -n dch-tenant-a dch-test-user-dch-read-write
+oc get rolebindings -n dch-tenant-a dch-test-user-dch-read-write
+```
+You should see:
+```
 NAME                           ROLE                         AGE
 dch-test-user-dch-read-write   ClusterRole/dch-read-write   41s
 ```
@@ -281,7 +317,10 @@ As a DCH user, you can get connection types. You can run the script [scripts/get
 ### Create Connection
 Once there are connection types, you can create connections refering to the connection types. As a DCH admin user, you can run the script [scripts/create-connection.sh](scripts/create-connection.sh) to create a connection with the connection type id above. For example:
 ```console
-$ ./create-connection.sh 5ea3f696-ffaf-4897-b869-8e993e319385
+./create-connection.sh 5ea3f696-ffaf-4897-b869-8e993e319385
+```
+You should see:
+```
 ...
 {
   "metadata": {
@@ -344,6 +383,9 @@ As a DCH user, you can call DCH services to ingest data.
 You can run the script [scripts/get-data.sh](scripts/get-data.sh) to get data from a connection using the connection `id`. In addition to getting the data, this script also downloads `grpcurl`, downloads Flight proto file, uses Python `pyarrow` to decode the returned arrow data for display. The output should be similar to:
 ```console
 ./get-data.sh 34813d1c-9f94-4bb4-b1c7-954bed66a81e
+```
+You should see:
+```
 Using audience (Service Account Issuer): https://rh-oidc.s3.us-east-1.amazonaws.com/27bd6cg0vs7nn08mue83fbof94dj4m9a
 
   Token obtained for dch-test-user
@@ -387,7 +429,7 @@ Python SDK installation and examples can be found [Python SDK](https://github.co
   ```
 - Check if gateway pod is running, for example:
   ```console
-  $ oc get po -n openshift-ingress | fgrep dch-gateway
+  oc get po -n openshift-ingress | fgrep dch-gateway
   ```
 ### Message: No healthy upstream
 - An example of error message:
@@ -396,31 +438,39 @@ Python SDK installation and examples can be found [Python SDK](https://github.co
   ```
 - Check if the HttpRoute exists. There must be an HttpRoute connecting to the gateway in the tenant infra namespace. Although, this Httproute is automatically recreated by the DCH operator:
   ```console
-  $ oc get httproute -n dch-infra-example
-  No resources found in dch-infra-example namespace.
+  oc get httproute -n dch-services
   ```
 
 ### Message: [invalid bearer token, token audiences ["..."] is invalid for the target audiences ["..."]]
 This happens when the service account issuer used in getting token doesn't match with the service account issuer in `dch-flight-service-config` configmap. Here are the steps:
 - Get the service account issuer. If it's empty, then it's assumed to be "https://kubernetes.default.svc":
   ```console
-  $ oc get authentication cluster -o jsonpath='{.spec.serviceAccountIssuer}
+  oc get authentication cluster -o jsonpath='{.spec.serviceAccountIssuer}
   ```
 - Compare to the entry in `dch-flight-service-config` configmap. If there's no entry, then it's assumed to be "https://kubernetes.default.svc":
   ```console
-  $ oc get cm dch-flight-service-config -n dch-services -o yaml | fgrep review
+  oc get cm dch-flight-service-config -n dch-services -o yaml | fgrep review
+  ```
+  You should see something like:
+  ```
     token_review_audiences = ["https://rh-oidc.s3.us-east-1.amazonaws.com/27bd6cg0vs7nn08mue83fbof94dj4m9a"]
   ```
 
 ### Get Gateway Log
 Here's an example of getting gateway log:
 ```console
-$ oc get pods -n openshift-ingress -l gateway.networking.k8s.io/gateway-name=data-science-gateway
+oc get pods -n openshift-ingress -l gateway.networking.k8s.io/gateway-name=data-science-gateway
+```
+You should see:
+```
 NAME                                                              READY   STATUS    RESTARTS   AGE
 data-science-gateway-data-science-gateway-class-685d587cc95vgwm   1/1     Running   0          162m
-
-
-$ oc logs -n openshift-ingress data-science-gateway-data-science-gateway-class-685d587cc95vgwm  -f
+```
+```
+oc logs -n openshift-ingress data-science-gateway-data-science-gateway-class-685d587cc95vgwm  -f
+```
+You should see:
+```
 2026-08-17T12:57:54.551993Z     info    FLAG: --concurrency="0"
 2026-08-17T12:57:54.552038Z     info    FLAG: --domain="openshift-ingress.svc.cluster.local"
 ```
