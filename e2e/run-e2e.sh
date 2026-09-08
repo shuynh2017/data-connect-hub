@@ -49,6 +49,7 @@ set +a
 : "${DCH_TENANT_ID:?DCH_TENANT_ID is required (set it in $CONFIG_FILE)}"
 : "${DCH_NO_ACCESS_NAMESPACE:?DCH_NO_ACCESS_NAMESPACE is required (set it in $CONFIG_FILE)}"
 : "${DCH_FLIGHT_SA:?DCH_FLIGHT_SA is required (set it in $CONFIG_FILE)}"
+: "${DCH_REST_SA:?DCH_REST_SA is required (set it in $CONFIG_FILE)}"
 DCH_TOKEN_AUDIENCE="${DCH_TOKEN_AUDIENCE:-}"
 : "${DCH_INSECURE:?DCH_INSECURE is required (set it in $CONFIG_FILE)}"
 : "${DCH_POSTGRES_IMAGE:?DCH_POSTGRES_IMAGE is required (set it in $CONFIG_FILE)}"
@@ -56,8 +57,7 @@ DCH_GATEWAY_AUTH_REQUIRED="${DCH_GATEWAY_AUTH_REQUIRED:-false}"
 
 DCH_TENANT_PG_URL="${DCH_TENANT_PG_URL:-}"
 DCH_TENANT_PG_CA_CERT="${DCH_TENANT_PG_CA_CERT:-}"
-DCH_TENANT_MILVUS_HOST="${DCH_TENANT_MILVUS_HOST:-}"
-DCH_TENANT_MILVUS_PORT="${DCH_TENANT_MILVUS_PORT:-19530}"
+DCH_TENANT_MILVUS_URI="${DCH_TENANT_MILVUS_URI:-}"
 DCH_TENANT_ES_URI="${DCH_TENANT_ES_URI:-}"
 DCH_TENANT_ES_NAMESPACE="${DCH_TENANT_ES_NAMESPACE:-$DCH_TENANT_ID}"
 DCH_TENANT_ES_USERNAME="${DCH_TENANT_ES_USERNAME:-}"
@@ -149,10 +149,9 @@ setup_s3_secret() {
 
 setup_milvus_secret() {
     E2E_MILVUS_ENABLED="false"
-    if [[ -n "$DCH_TENANT_MILVUS_HOST" ]]; then
+    if [[ -n "$DCH_TENANT_MILVUS_URI" ]]; then
         local -a args=(
-            --from-literal="MILVUS_HOST=${DCH_TENANT_MILVUS_HOST}"
-            --from-literal="MILVUS_PORT=${DCH_TENANT_MILVUS_PORT}"
+            --from-literal="MILVUS_URI=${DCH_TENANT_MILVUS_URI}"
         )
         [[ -n "${DCH_TENANT_MILVUS_TOKEN:-}" ]] && args+=(--from-literal="MILVUS_TOKEN=${DCH_TENANT_MILVUS_TOKEN}")
         [[ -n "${DCH_TENANT_MILVUS_DATABASE:-}" ]] && args+=(--from-literal="MILVUS_DATABASE=${DCH_TENANT_MILVUS_DATABASE}")
@@ -292,6 +291,12 @@ setup_flight_secret_rbac() {
         --role=e2e-flight-secret-read \
         --serviceaccount="${DCH_SERVICE_NAMESPACE}:${DCH_FLIGHT_SA}" \
         --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+
+    kubectl create rolebinding e2e-rest-secret-read-rb \
+        -n "$DCH_TENANT_ID" \
+        --role=e2e-flight-secret-read \
+        --serviceaccount="${DCH_SERVICE_NAMESPACE}:${DCH_REST_SA}" \
+        --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 }
 
 # -------------------------------------------------------------------
@@ -327,7 +332,7 @@ seed_s3_data() {
 
 seed_milvus_data() {
     [[ "$E2E_MILVUS_ENABLED" == "true" ]] || return 0
-    local milvus_uri="http://${DCH_TENANT_MILVUS_HOST}:${DCH_TENANT_MILVUS_PORT}"
+    local milvus_uri="${DCH_TENANT_MILVUS_URI}"
     bash "$(dirname "$0")/scripts/seed-milvus-data.sh" \
         -e "$milvus_uri" -n "$DCH_TENANT_ID"
 }
@@ -510,7 +515,7 @@ seed_milvus_data
 if [[ "$E2E_MILVUS_ENABLED" == "true" ]]; then
     echo "[8/11] Milvus test data seeded"
 else
-    echo "[8/11] Milvus seed skipped (DCH_TENANT_MILVUS_HOST not set)"
+    echo "[8/11] Milvus seed skipped (DCH_TENANT_MILVUS_URI not set)"
 fi
 
 seed_es_data
