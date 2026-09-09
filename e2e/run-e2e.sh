@@ -52,7 +52,7 @@ set +a
 : "${DCH_REST_SA:?DCH_REST_SA is required (set it in $CONFIG_FILE)}"
 DCH_TOKEN_AUDIENCE="${DCH_TOKEN_AUDIENCE:-}"
 : "${DCH_INSECURE:?DCH_INSECURE is required (set it in $CONFIG_FILE)}"
-: "${DCH_POSTGRES_IMAGE:?DCH_POSTGRES_IMAGE is required (set it in $CONFIG_FILE)}"
+DCH_POSTGRES_IMAGE="${DCH_POSTGRES_IMAGE:-}"
 DCH_GATEWAY_AUTH_REQUIRED="${DCH_GATEWAY_AUTH_REQUIRED:-false}"
 
 DCH_TENANT_PG_URL="${DCH_TENANT_PG_URL:-}"
@@ -172,7 +172,7 @@ fetch_es_ca_cert() {
 setup_es_secret() {
     E2E_ES_ENABLED="false"
     if [[ -n "$DCH_TENANT_ES_URI" ]]; then
-        local -a args=(--from-literal="ES_HOST=${DCH_TENANT_ES_URI}")
+        local -a args=(--from-literal="ES_URI=${DCH_TENANT_ES_URI}")
         [[ -n "$DCH_TENANT_ES_USERNAME" ]] && args+=(--from-literal="ES_USERNAME=${DCH_TENANT_ES_USERNAME}")
         [[ -n "$DCH_TENANT_ES_PASSWORD" ]] && args+=(--from-literal="ES_PASSWORD=${DCH_TENANT_ES_PASSWORD}")
 
@@ -212,7 +212,7 @@ setup_es_apikey_secret() {
     encoded_api_key=$(echo "$api_key_json" | python3 -c "import sys,json; print(json.load(sys.stdin)['encoded'])" 2>/dev/null) || return 0
 
     local -a args=(
-        --from-literal="ES_HOST=${DCH_TENANT_ES_URI}"
+        --from-literal="ES_URI=${DCH_TENANT_ES_URI}"
         --from-literal="ES_API_KEY=${encoded_api_key}"
     )
     local ca_cert="$DCH_TENANT_ES_CA_CERT"
@@ -324,7 +324,7 @@ seed_s3_data() {
         echo "ERROR: set DCH_MINIO_MC_IMAGE to a digest-pinned image (e.g. minio/mc@sha256:<digest>) in $CONFIG_FILE" >&2
         exit 1
     }
-    bash "$(dirname "$0")/scripts/seed-s3-data.sh" \
+    PYTHON="$VENV_PYTHON" bash "$(dirname "$0")/scripts/seed-s3-data.sh" \
         -e "$AWS_S3_ENDPOINT" -n "$DCH_TENANT_ID" -b "$AWS_S3_BUCKET" \
         -A "$AWS_ACCESS_KEY_ID" -S "$AWS_SECRET_ACCESS_KEY" \
         -i "$mc_image"

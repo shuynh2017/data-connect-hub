@@ -27,6 +27,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -76,6 +77,9 @@ const (
 	platformConfigName = "opendatahub-dataconnecthub-config"
 
 	finalizerName = "dataconnecthub.opendatahub.io/finalizer"
+
+	managedByLabel      = "dataconnecthub.opendatahub.io/managed-by"
+	managedByDCHService = "dataconnectservice"
 
 	releasePlatform = "platform"
 )
@@ -182,6 +186,7 @@ func (r *DataConnectServiceReconciler) Reconcile(ctx context.Context, req ctrl.R
 			log.Info("running finalizer for DataConnectService")
 			r.clearSyncedAnnotations(ctx)
 			r.deleteInitDataConnectionTypes(ctx, cr.Namespace)
+			r.deleteClusterScopedResources(ctx, cr.UID)
 			controllerutil.RemoveFinalizer(&cr, finalizerName)
 			return ctrl.Result{}, r.Update(ctx, &cr)
 		}
@@ -527,6 +532,38 @@ func (r *DataConnectServiceReconciler) clearSyncedAnnotations(ctx context.Contex
 	}
 }
 
+func (r *DataConnectServiceReconciler) deleteClusterScopedResources(ctx context.Context, ownerUID types.UID) {
+	log := logf.FromContext(ctx)
+
+	var clusterRoles rbacv1.ClusterRoleList
+	if err := r.List(ctx, &clusterRoles, client.MatchingLabels{managedByLabel: managedByDCHService}); err != nil {
+		log.Error(err, "Failed to list DCH ClusterRoles for cleanup")
+	} else {
+		for i := range clusterRoles.Items {
+			role := &clusterRoles.Items[i]
+			if isOwnedBy(role, ownerUID) {
+				if err := r.Delete(ctx, role); err != nil && !apierrors.IsNotFound(err) {
+					log.Error(err, "Failed to delete DCH ClusterRole", "name", role.Name)
+				}
+			}
+		}
+	}
+
+	var clusterRoleBindings rbacv1.ClusterRoleBindingList
+	if err := r.List(ctx, &clusterRoleBindings, client.MatchingLabels{managedByLabel: managedByDCHService}); err != nil {
+		log.Error(err, "Failed to list DCH ClusterRoleBindings for cleanup")
+	} else {
+		for i := range clusterRoleBindings.Items {
+			binding := &clusterRoleBindings.Items[i]
+			if isOwnedBy(binding, ownerUID) {
+				if err := r.Delete(ctx, binding); err != nil && !apierrors.IsNotFound(err) {
+					log.Error(err, "Failed to delete DCH ClusterRoleBinding", "name", binding.Name)
+				}
+			}
+		}
+	}
+}
+
 // resolveGateway merges gateway config: CR spec overrides ConfigMap, which overrides hardcoded defaults.
 func (r *DataConnectServiceReconciler) resolveGateway(cr *dchv1alpha1.DataConnectService, platCfg *platformConfig) dchv1alpha1.Gateway {
 	gw := dchv1alpha1.Gateway{
@@ -659,7 +696,7 @@ func (r *DataConnectServiceReconciler) pendingDeployments(ctx context.Context, n
 	deployList := &appsv1.DeploymentList{}
 	if err := r.List(ctx, deployList,
 		client.InNamespace(namespace),
-		client.MatchingLabels{"dataconnecthub.opendatahub.io/managed-by": "dataconnectservice"},
+		client.MatchingLabels{managedByLabel: managedByDCHService},
 	); err != nil {
 		return nil, fmt.Errorf("listing managed deployments: %w", err)
 	}
@@ -719,7 +756,7 @@ func (r *DataConnectServiceReconciler) SetupWithManager(mgr ctrl.Manager) error 
 			handler.EnqueueRequestsFromMapFunc(r.platformConfigToReconcile),
 			builder.WithPredicates(isPlatformConfig),
 		).
-		Named("dataconnectservice").
+		Named(managedByDCHService).
 		Complete(r)
 }
 

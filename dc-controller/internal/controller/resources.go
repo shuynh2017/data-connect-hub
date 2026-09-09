@@ -376,7 +376,7 @@ func (r *DataConnectServiceReconciler) applyResources(
 		if labels == nil {
 			labels = map[string]string{}
 		}
-		labels["dataconnecthub.opendatahub.io/managed-by"] = "dataconnectservice"
+		labels[managedByLabel] = managedByDCHService
 		obj.SetLabels(labels)
 
 		if err := controllerutil.SetControllerReference(cr, obj, r.Scheme); err != nil {

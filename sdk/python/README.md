@@ -4,15 +4,16 @@ Python client library for the [Data Connect Hub](https://github.com/opendatahub-
 
 ## Installation
 
-> **Note:** This package is not yet published to PyPI. Install from source, or from TestPyPI for a pre-release build.
-
 ```bash
 # REST only (default)
-pip install sdk/python
+pip install data-connect-hub
 
 # REST + Flight SQL
-pip install "sdk/python[flight]"
+pip install "data-connect-hub[flight]"
 ```
+
+To install from a source checkout, use `pip install sdk/python` or
+`pip install "sdk/python[flight]"`.
 
 TestPyPI builds are PEP 440 development releases, so `--pre` is required. Install
 the SDK without dependencies from TestPyPI, then install its dependencies from
@@ -262,12 +263,13 @@ clone or a tree without usable package metadata fails to build.
 **TestPyPI (pre-release).** Run the *Publish Python SDK to TestPyPI* workflow manually
 from the Actions tab. The version is a development release derived from the distance
 since the last tag, for example `0.1.devN` before the first tag exists and
-`0.1.1.dev12` after `v0.1.0`. Re-dispatching on an already-published commit produces
+`0.1.1.dev12` after `sdk-v0.1.0`. Re-dispatching on an already-published commit produces
 the same version and fails on the duplicate upload; land a commit first.
 
-**PyPI (tagged release).** Push a tag of `v` followed by the PEP 440 version, for
-example `v0.1.0`; the tag is what defines the published version. The *Release Python SDK*
-workflow builds the distribution, verifies it matches the tag, and creates the GitHub Release.
+**PyPI (tagged release).** Push an SDK-specific tag of `sdk-v` followed by the PEP 440
+version, for example `sdk-v0.1.0`; the tag is what defines the published version. The
+*Release Python SDK* workflow builds and validates the distribution, publishes it to PyPI
+using trusted publishing, then creates the GitHub Release.
 
 Locally, `make sdk-package-check` builds and validates the distribution the same way CI does.
 
