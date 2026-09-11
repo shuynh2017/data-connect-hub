@@ -62,3 +62,6 @@ docs/**/
 # Generated Postgres credentials (run config/db/postgres/generate-secrets.sh)
 config/db/postgres/postgres-credentials.env
 config/db/postgres/secret-config.toml
+
+# Local cluster/dev helper scripts and kubeconfigs (not for publication)
+sup/
