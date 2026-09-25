@@ -29,7 +29,7 @@ namespace/dch-services labeled
 Metrics are enabled by default for DCH REST and flight services. You can check as follows:
 
 ```console
-oc get cm -n dch-services dch-flight-service-config -o yaml
+oc get cm -n dch-services dch-default-dataconnectservice-flight-config -o yaml
 ```
 You should see:
 ```console
