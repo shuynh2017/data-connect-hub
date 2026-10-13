@@ -21,4 +21,4 @@ CT_DATA='{
 
 echo Gateway URL=$GW_URL
 
-curl -k -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $user_token" -H "x-tenant-id: $TENANT_NAMESPACE" -d "$CT_DATA"  "${GW_URL}${API_PATH}" 
+curl -k -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $user_token" -H "x-tenant-id: $TENANT_NAMESPACE" -d "$CT_DATA"  "${GW_URL}${API_PATH}" | jq .

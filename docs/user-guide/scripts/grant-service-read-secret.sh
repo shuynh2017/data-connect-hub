@@ -25,6 +25,6 @@ roleRef:
   name: dch-flight-secret-reader
 subjects:
   - kind: ServiceAccount
-    name: dch-flight-service-sa
+    name: dch-default-dataconnectservice-flight-sa
     namespace: $INFRA_NAMESPACE
 EOF
